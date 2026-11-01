@@ -128,7 +128,7 @@ int fl_scan(fl_t *l, const fl_fs_t *fs)
     l->dropped += g.dropped;
     for (int i = 0; i < g.n; i++) {
         if (fs->list_apps) {
-            const char *shown = !strncmp(g.g[i], "trmnl-", 6) && g.g[i][6] ? g.g[i] + 6 : g.g[i];
+            const char *shown = !memcmp(g.g[i], "trmnl-", 6) && g.g[i][6] ? g.g[i] + 6 : g.g[i];
             char grp[FL_GROUP];
             size_t n = strlen(shown) >= FL_GROUP ? FL_GROUP - 1 : strlen(shown);
             memcpy(grp, shown, n), grp[n] = 0;

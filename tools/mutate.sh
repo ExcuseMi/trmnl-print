@@ -40,7 +40,7 @@ run src/pr.c 's/net.format = fn == 3 \&\& !memcmp(fmt, "pcl", 3) ? PJ_PCL : PJ_P
 run src/imgfit.c 's/int m = IMG_MARGIN \* pw \/ 2480;/int m = IMG_MARGIN;/' test_fit
 run src/flist.c 's/return a->mtime < b->mtime ? 1 : -1;/return a->mtime < b->mtime ? -1 : 1;/' test_appfs
 run src/flist.c 's/if (!sub_folders || depth >= FL_DEPTH) return;/if (!sub_folders || depth >= FL_DEPTH + 1) return;/' test_appfs
-run src/flist.c 's/!strncmp(g.g\[i\], "trmnl-", 6)/!strncmp(g.g[i], "trmnl+", 6)/' test_appfs
+run src/flist.c 's/!memcmp(g.g\[i\], "trmnl-", 6)/!memcmp(g.g[i], "trmnl+", 6)/' test_appfs
 run src/appfs.c 's/api->size >= APP_API_SLOT(53) ? f_list_apps/api->size >= APP_API_SLOT(50) ? f_list_apps/' test_appfs
 run src/appfs.c 's/if (a->api->size < APP_API_SLOT(53)) return -1;//' test_appfs
 run src/appfs.c 's/if (rc < 0) return free(b), -1;/if (rc < 0) return -1;/' test_appfs
