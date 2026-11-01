@@ -6,7 +6,7 @@ import os, sys
 from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__)); FD = os.path.join(HERE, "..", "fonts")
 WEIGHTS = ["Medium", "SemiBold", "Bold"]
-ASCII = "".join(chr(c) for c in range(32, 127)) + "".join(chr(c) for c in range(0xA1, 0x100)) + "–—‘’“”…€•"  # + Latin-1 and common punctuation: documents are printed
+ASCII = "".join(chr(c) for c in range(32, 127)) + "".join(chr(c) for c in range(0xA1, 0x100)) + "\u2013\u2014\u2018\u2019\u201c\u201d\u2026\u20ac\u2022"  # + Latin-1 and common punctuation: documents are printed
 def charset(w, s, rec):
     cs = set(rec) | set("0123456789 .:-%")
     if s <= 100: cs |= set(ASCII)
