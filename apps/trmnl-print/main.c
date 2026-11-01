@@ -87,6 +87,7 @@ static int f_post(void *u, const char *url, const void *body, size_t n, uint8_t 
 
 static const app_setting_decl_t decl[] = {
     { "printer", "Printer address (IP, or IP:port; the port is 631 if left out)", 0, 0, 64, APP_SETTING_TEXT },
+    { "format", "Page format (pwg: image/pwg-raster, pcl: PCL as octet-stream)", "pwg|pcl", 0, 0, APP_SETTING_CHOICE },
 };
 
 static void push(int full)
@@ -106,11 +107,11 @@ int app_main(const app_api_t *a)
     gfx_t g;
     gfx_init(&g, fb, fw, fh, stride, orient);
     int has_settings = api->size >= APP_API_SLOT(47);
-    if (has_settings) api->settings_declare(decl, 1);
+    if (has_settings) api->settings_declare(decl, 2);
     env.files = (fl_fs_t){ 0, f_list };
     env.read = f_read;
     env.cfg_get = cfg_get;
-    env.net = (pj_net_t){ f_post, 0 };
+    env.net = (pj_net_t){ PJ_PWG, f_post, 0 };
     pr_init(&pr, &env);
     int sharing = 0, share_rc = 0;
     uint32_t sec = 0;

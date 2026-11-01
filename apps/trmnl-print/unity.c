@@ -7,6 +7,7 @@
 #include "../../src/gfx.c"
 #include "../../src/pngio.c"
 #include "../../src/pcl.c"
+#include "../../src/pwg.c"
 #include "../../src/ipp.c"
 #include "../../src/imgfit.c"
 #include "../../src/textlay.c"

@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 /* The controller: list paging, preview, print flow, the printer setting, errors on the screen. SPDX-License-Identifier: MIT */
 #include "check.h"
 #include <stdio.h>
@@ -10,17 +11,18 @@
 typedef struct {
     ffs_t fs;
     printer_t pr;
-    char printer[64];
+    char printer[64], format[8];
     pr_env_t env;
 } rig_t;
 
 static int rig_cfg(void *u, const char *k, char *b, int cap)
 {
     rig_t *r = u;
-    if (strcmp(k, "printer") || !r->printer[0]) return -1;
-    int n = (int)strlen(r->printer);
+    const char *v = !strcmp(k, "printer") ? r->printer : !strcmp(k, "format") ? r->format : "";
+    if (!v[0]) return -1;
+    int n = (int)strlen(v);
     if (n > cap) n = cap;
-    memcpy(b, r->printer, (size_t)n);
+    memcpy(b, v, (size_t)n);
     return n;
 }
 static int rig_read(void *u, const char *g, const char *n, uint8_t **b, size_t *sz) { return ffs_read(&((rig_t *)u)->fs, g, n, b, sz); }
@@ -49,7 +51,7 @@ static void rig_new(rig_t *r)
     r->env.files = (fl_fs_t){ &r->fs, ffs_list };
     r->env.read = rig_read;
     r->env.cfg_get = rig_cfg;
-    r->env.net = (pj_net_t){ fake_post, &r->pr };
+    r->env.net = (pj_net_t){ PJ_PWG, fake_post, &r->pr };
     r->env.u = r;
 }
 static void rig_free(rig_t *r)
@@ -134,6 +136,16 @@ static void preview_and_print(void)
     CHECK(p.mode == PR_RESULT && p.print_req == 0 && r.pr.posts == 1);
     CHECK(!strcmp(p.note, "Sent 1 page to the printer"));
     CHECK(!strcmp(r.pr.url, "http://10.0.0.7:631/ipp/print"));
+    CHECK(memmem(r.pr.body[0], r.pr.len[0], "image/pwg-raster", 16));        /* the default format */
+    strcpy(r.format, "pcl");
+    p.mode = PR_PREVIEW, p.print_req = 1;
+    pr_run_print(&p);
+    CHECK(memmem(r.pr.body[1], r.pr.len[1], "application/octet-stream", 24)); /* the setting "format: pcl" */
+    strcpy(r.format, "junk");
+    p.mode = PR_PREVIEW, p.print_req = 1;
+    pr_run_print(&p);
+    CHECK(memmem(r.pr.body[2], r.pr.len[2], "image/pwg-raster", 16));        /* anything else is the default */
+    r.format[0] = 0;
     tap(&p, APP_TOUCH_MIDDLE);
     CHECK(p.mode == PR_PREVIEW);                            /* back to the preview */
     tap(&p, APP_TOUCH_RIGHT);                               /* next file */
@@ -146,7 +158,7 @@ static void preview_and_print(void)
     CHECK(p.mode == PR_PREVIEW && p.data && !p.px);
     tap(&p, APP_TOUCH_MIDDLE);
     pr_run_print(&p);
-    CHECK(p.mode == PR_RESULT && r.pr.posts == 2);
+    CHECK(p.mode == PR_RESULT && r.pr.posts == 4);
     pr_free(&p);
     rig_free(&r);
 }

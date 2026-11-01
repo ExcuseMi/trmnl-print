@@ -53,6 +53,15 @@ static void corner_dot(uint8_t *px, int stride, int w, int h)
 
 static int ink_at(const uint8_t *row, int x) { return !(row[x >> 3] & (0x80 >> (x & 7))); }
 
+static void at_600_dpi(void)
+{
+    fit_t f;
+    CHECK(fit_compute(1872, 1404, 4960, 7016, &f) == 0 && f.rotate);
+    CHECK(f.x >= 2 * IMG_MARGIN - 8 && f.y >= 2 * IMG_MARGIN);                 /* the same millimetres of margin as at 300 dpi */
+    CHECK(f.x + f.w <= 4960 - 2 * IMG_MARGIN + 8 && f.y + f.h <= 7016 - 2 * IMG_MARGIN);
+    CHECK(abs(f.x - (4960 - f.x - f.w)) <= 1 && abs(f.y - (7016 - f.y - f.h)) <= 1);
+}
+
 static void rows(void)
 {
     /* a 160 x 80 picture with a top-left block, wide: turned clockwise, the top-left goes to the top RIGHT */
@@ -152,6 +161,7 @@ static void dims(void)
 int main(void)
 {
     sizes();
+    at_600_dpi();
     rows();
     thin_line_survives_downscale();
     half_covered_is_ink();

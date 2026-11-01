@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pwg.h"
 #include "util.h"
 
 static void ink_block(uint8_t *px, int stride, int w, int h)
@@ -21,19 +22,19 @@ static const uint8_t *find(const uint8_t *h, size_t n, const char *needle, size_
 static void ipp_bytes(void)
 {
     uint8_t b[256];
-    size_t n = ipp_print_job_header(b, sizeof(b), "192.0.2.40", 631, "doc");
+    size_t n = ipp_print_job_header(b, sizeof(b), "192.0.2.40", 631, "doc", IPP_PWG);
     CHECK(n > 0);
     CHECK(b[0] == 1 && b[1] == 1 && b[2] == 0 && b[3] == 2);     /* IPP 1.1, Print-Job */
     CHECK(b[4] == 0 && b[5] == 0 && b[6] == 0 && b[7] == 1 && b[8] == 1);
     CHECK(b[n - 1] == 3);                                          /* end of attributes */
     CHECK(find(b, n, "ipp://192.0.2.40:631/ipp/print", 33));
-    CHECK(find(b, n, "application/vnd.hp-PCL", 22));
+    CHECK(find(b, n, "image/pwg-raster", 16));
     /* the first attribute is the charset, as the standard needs it first */
     CHECK(b[8] == 1 && b[9] == 0x47 && b[10] == 0 && b[11] == 18 && !memcmp(b + 12, "attributes-charset", 18));
-    for (size_t cap = 0; cap < n; cap += 13) CHECK(ipp_print_job_header(b, cap, "192.0.2.40", 631, "doc") == 0); /* too small: refused */
-    CHECK(ipp_print_job_header(b, sizeof(b), "", 631, "doc") == 0);
-    CHECK(ipp_print_job_header(b, sizeof(b), "h", 0, "doc") == 0);
-    CHECK(ipp_print_job_header(b, sizeof(b), "h", 70000, "doc") == 0);
+    for (size_t cap = 0; cap < n; cap += 13) CHECK(ipp_print_job_header(b, cap, "192.0.2.40", 631, "doc", IPP_PWG) == 0); /* too small: refused */
+    CHECK(ipp_print_job_header(b, sizeof(b), "", 631, "doc", IPP_PWG) == 0);
+    CHECK(ipp_print_job_header(b, sizeof(b), "h", 0, "doc", IPP_PWG) == 0);
+    CHECK(ipp_print_job_header(b, sizeof(b), "h", 70000, "doc", IPP_PWG) == 0);
     uint8_t resp[8] = { 1, 1, 0, 0, 0, 0, 0, 1 };
     CHECK(ipp_status(resp, 8) == 0);
     resp[2] = 0x04, resp[3] = 0x05;
@@ -66,7 +67,7 @@ static void png_job(void)
     uint8_t *png = make_png(1872, 1404, ink_block, &n);
     printer_t pr;
     printer_init(&pr);
-    pj_net_t net = { fake_post, &pr };
+    pj_net_t net = { PJ_PCL, fake_post, &pr };
     pj_result_t r;
     CHECK(pj_print_png(&net, "192.0.2.40", png, n, &r) == 0);
     CHECK(pr.posts == 1 && r.pages == 1 && r.jobs == 1);
@@ -74,7 +75,7 @@ static void png_job(void)
     CHECK(!strcmp(r.msg, "Sent 1 page to the printer"));
     const uint8_t *b = pr.body[0];
     uint8_t hb[300];
-    size_t hl = ipp_print_job_header(hb, sizeof(hb), "192.0.2.40", 631, "tiny-paper");
+    size_t hl = ipp_print_job_header(hb, sizeof(hb), "192.0.2.40", 631, "tiny-paper", IPP_PCL);
     CHECK(hl > 0);
     const char start[] = "\x1b" "E" "\x1b&u300D" "\x1b&l26A" "\x1b&l0O";
     CHECK(!memcmp(b + hl, start, sizeof(start) - 1));
@@ -118,7 +119,7 @@ static void text_job(void)
 {
     printer_t pr;
     printer_init(&pr);
-    pj_net_t net = { fake_post, &pr };
+    pj_net_t net = { PJ_PCL, fake_post, &pr };
     pj_result_t r;
     CHECK(pj_print_text(&net, "p:9000", "# Title\n\nSome text here.\n", 25, &r) == 0);
     CHECK(pr.posts == 1 && r.pages == 1 && !strcmp(pr.url, "http://p:9000/ipp/print"));
@@ -172,8 +173,53 @@ static void text_job(void)
     free(s);
 }
 
+static void pwg_jobs(void)
+{
+    size_t n;
+    uint8_t *png = make_png(1872, 1404, ink_block, &n);
+    printer_t pr;
+    printer_init(&pr);
+    pj_net_t net = { PJ_PWG, fake_post, &pr };
+    pj_result_t r;
+    CHECK(pj_print_png(&net, "192.0.2.40", png, n, &r) == 0 && pr.posts == 1 && r.pages == 1);
+    const uint8_t *b = pr.body[0];
+    CHECK(find(b, pr.len[0], "image/pwg-raster", 16) && !find(b, pr.len[0], "application/octet-stream", 24));
+    uint8_t hb[300];
+    size_t hl = ipp_print_job_header(hb, sizeof(hb), "192.0.2.40", 631, "tiny-paper", IPP_PWG);
+    CHECK(!memcmp(b + hl, "RaS2PwgRaster", 13));
+    CHECK(pr.len[0] > hl + 1800 && pr.len[0] < 400000);      /* a mostly white page stays small */
+    /* the picture is centred on the 600 dpi page: a 2280 x 3040 (300 dpi) fit is 4560 x 6080 here */
+    const uint8_t *ph = b + hl + 4;
+    CHECK(ph[372 + 2] == 0x13 && ph[372 + 3] == 0x60);      /* 4960 */
+    printer_free(&pr);
+    printer_init(&pr);
+    /* a text page: 600 dpi rows are 1 byte a pixel, so it is bigger than PCL; one page must fit the job buffer */
+    char *s = malloc(60000);
+    s[0] = 0;
+    for (int i = 0; i < 52; i++) strcat(s, "A line of the long text that is printed, with some more words.\n");
+    CHECK(pj_print_text(&net, "p", s, strlen(s), &r) == 0 && r.pages == 1);
+    fprintf(stderr, "pwg full text page job %zu bytes\n", pr.len[0]);
+    CHECK(pr.len[0] < PJ_JOB_BYTES);
+    /* 600 dpi: the 300 dpi text is doubled, so its top margin (150 px) is 300 white rows: a 256 group, then 44 */
+    const uint8_t *ras = find(pr.body[0], pr.len[0], "RaS2", 4);
+    CHECK(ras && ras[4 + PWG_HEADER] == 255);
+    printer_free(&pr);
+    /* more pages than one job holds: split in order, each job whole (starts with RaS2) */
+    for (int i = 0; i < 150; i++) strcat(s, "Another line of the long text that is printed here.\n");
+    size_t keep = pj_job_bytes;
+    pj_job_bytes = 1500000;
+    printer_init(&pr);
+    CHECK(pj_print_text(&net, "p", s, strlen(s), &r) == 0 && r.pages >= 3 && pr.posts == r.jobs);
+    for (int i = 0; i < pr.posts && i < 8; i++) CHECK(find(pr.body[i], pr.len[i], "RaS2PwgRaster", 13) && pr.len[i] <= 1500000);
+    printer_free(&pr);
+    pj_job_bytes = keep;
+    free(s);
+    free(png);
+}
+
 int main(void)
 {
+    pwg_jobs();
     ipp_bytes();
     address();
     png_job();

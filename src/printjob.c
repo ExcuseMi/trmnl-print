@@ -6,6 +6,7 @@
 #include "ipp.h"
 #include "pcl.h"
 #include "pngio.h"
+#include "pwg.h"
 #include "textlay.h"
 
 #define PJ_FULL (-2)
@@ -104,8 +105,9 @@ static int job_open(job_t *j, const pj_net_t *net, const char *printer, pj_resul
 static void job_start(job_t *j)
 {
     pcl_out_t o = { buf_write, &j->b, 0, 0 };
-    j->b.n = ipp_print_job_header(j->b.p, j->b.cap, j->host, j->port, "tiny-paper");
-    pcl_job_begin(&o);
+    j->b.n = ipp_print_job_header(j->b.p, j->b.cap, j->host, j->port, "tiny-paper", j->net->format == PJ_PCL ? IPP_PCL : IPP_PWG);
+    if (j->net->format == PJ_PCL) pcl_job_begin(&o);
+    else pwg_job_begin(&o);
     j->header = j->b.n;
     j->mark = j->b.n;
 }
@@ -113,7 +115,7 @@ static void job_start(job_t *j)
 static int job_send(job_t *j)
 {
     pcl_out_t o = { buf_write, &j->b, 0, 0 };
-    pcl_job_end(&o);
+    if (j->net->format == PJ_PCL) pcl_job_end(&o);
     size_t rn = 0;
     int st = j->net->post(j->net->u, j->url, j->b.p, j->b.n, j->resp, sizeof(j->resp), &rn);
     if (st == PJ_NET_TIMEOUT) return say(j->r, "Printer did not answer: timeout", "", -1), -1;
@@ -135,12 +137,12 @@ static int pj_done(job_t *j, int rc)
 }
 
 /* Writes one page into the current job; when it does not fit, sends what is there first and starts a new job */
-static int job_page(job_t *j, const pcl_region_t *reg)
+static int job_page(job_t *j, const pcl_region_t *reg, int scale)
 {
     for (int attempt = 0; attempt < 2; attempt++) {
         pcl_out_t o = { buf_write, &j->b, 0, 0 };
         j->mark = j->b.n;
-        int rc = pcl_page(&o, reg);
+        int rc = j->net->format == PJ_PCL ? pcl_page(&o, reg) : pwg_page(&o, reg, scale);
         if (rc == 0) {
             j->r->pages++;
             return 0;
@@ -179,12 +181,13 @@ int pj_print_png(const pj_net_t *net, const char *printer, const uint8_t *file, 
     if (!px) return say(r, "Not enough memory to print", "", -1), -1;
     if (png_decode(file, n, px, w, h, stride) < 0) return free(px), say(r, "Not a 1-bit PNG (only Sketch pictures are read)", "", -1), -1;
     pic.im.px = px;
-    fit_compute(w, h, PCL_PAGE_W, PCL_PAGE_H, &pic.f);
+    int pwg = net->format != PJ_PCL;
+    fit_compute(w, h, pwg ? PWG_PAGE_W : PCL_PAGE_W, pwg ? PWG_PAGE_H : PCL_PAGE_H, &pic.f);
     job_t j;
     if (job_open(&j, net, printer, r) < 0) return free(px), -1;
     job_start(&j);
     pcl_region_t reg = { pic.f.x, pic.f.y, pic.f.w, pic.f.h, pic_row, &pic };
-    int rc = job_page(&j, &reg);
+    int rc = job_page(&j, &reg, 1);
     if (rc == 0) rc = job_send(&j);
     free(px);
     return pj_done(&j, rc);
@@ -231,7 +234,7 @@ int pj_print_text(const pj_net_t *net, const char *printer, const char *text, si
         int w = (PCL_PAGE_W - 2 * TL_MARGIN_X) & ~7;
         txt_t x = { &t, lines, k, w, -BAND_ROWS, BAND_ROWS, band };
         pcl_region_t reg = { TL_MARGIN_X, TL_MARGIN_TOP, w, t.y_end > 0 ? t.y_end : 1, txt_row, &x };
-        rc = job_page(&j, &reg);
+        rc = job_page(&j, &reg, 2); /* a PWG page is 600 dpi: the 300 dpi text is doubled */
     }
     if (rc == 0) rc = job_send(&j);
     free(band);

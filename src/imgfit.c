@@ -20,7 +20,8 @@ int fit_compute(int sw, int sh, int pw, int ph, fit_t *f)
     if (sw <= 0 || sh <= 0 || sw > IMG_MAX_DIM || sh > IMG_MAX_DIM) return -1;
     f->rotate = sw > sh;
     int ew = f->rotate ? sh : sw, eh = f->rotate ? sw : sh;
-    int aw = pw - 2 * IMG_MARGIN, ah = ph - 2 * IMG_MARGIN, dw, dh;
+    int m = IMG_MARGIN * pw / 2480; /* the margin is in 300 dpi pixels; a 600 dpi page keeps the same millimetres */
+    int aw = pw - 2 * m, ah = ph - 2 * m, dw, dh;
     if ((long)ew * ah > (long)eh * aw) { /* limited by the width */
         dw = aw & ~7;
         dh = (int)(((long)eh * dw + ew / 2) / ew);

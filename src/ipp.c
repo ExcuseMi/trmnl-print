@@ -29,7 +29,7 @@ static void attr(wr_t *w, int tag, const char *name, const char *val)
     wput(w, val, lv);
 }
 
-size_t ipp_print_job_header(uint8_t *out, size_t cap, const char *host, int port, const char *job_name)
+size_t ipp_print_job_header(uint8_t *out, size_t cap, const char *host, int port, const char *job_name, const char *mime)
 {
     wr_t w = { out, cap, 0, 0 };
     char uri[160];
@@ -53,7 +53,7 @@ size_t ipp_print_job_header(uint8_t *out, size_t cap, const char *host, int port
     attr(&w, 0x45, "printer-uri", uri);
     attr(&w, 0x42, "requesting-user-name", "tiny-paper");
     attr(&w, 0x42, "job-name", job_name);
-    attr(&w, 0x49, "document-format", "application/vnd.hp-PCL");
+    attr(&w, 0x49, "document-format", mime);
     put8(&w, 0x03);    /* end of attributes */
     return w.bad ? 0 : w.n;
 }

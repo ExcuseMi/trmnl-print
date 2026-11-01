@@ -11,6 +11,7 @@
 int png_write(const char *path, const gfx_t *g);
 
 static int bad;
+static const char *fmt_now = "pwg";
 static const char *dir;
 
 static void wave(uint8_t *px, int stride, int w, int h)
@@ -58,10 +59,18 @@ static int cap_post(void *u, const char *url, const void *body, size_t n, uint8_
     return 200;
 }
 
+static const char *pwg_name(const char *base)
+{
+    static char n[32];
+    snprintf(n, sizeof(n), "%s.%s", base, fmt_now);
+    return n;
+}
+
 static void save_pcl(const char *name, cap_t *c)
 {
-    size_t hl = 0; /* the IPP header ends at the end-of-attributes tag; the PCL job starts at its ESC E */
-    while (hl + 1 < c->n && !(c->b[hl] == 0x1b && c->b[hl + 1] == 'E')) hl++;
+    size_t hl = 0; /* the IPP header ends at the end-of-attributes tag; the document starts at its first bytes */
+    int pwg = !strcmp(fmt_now, "pwg");
+    while (hl + 3 < c->n && !(pwg ? !memcmp(c->b + hl, "RaS2", 4) : (c->b[hl] == 0x1b && c->b[hl + 1] == 'E'))) hl++;
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", dir, name);
     FILE *f = fopen(path, "wb");
@@ -91,12 +100,28 @@ typedef struct {
     cap_t cap;
 } rig_t;
 static int rread(void *u, const char *g, const char *n, uint8_t **b, size_t *s) { return ffs_read(&((rig_t *)u)->fs, g, n, b, s); }
-static int rcfg(void *u, const char *k, char *b, int cap) { return (void)u, (void)k, (void)b, (void)cap, -1; }
+static int rcfg(void *u, const char *k, char *b, int cap)
+{
+    (void)u;
+    if (strcmp(k, "format") || cap < 3) return -1;
+    memcpy(b, fmt_now, 3);
+    return 3;
+}
+
+static int run(void);
 
 int main(int argc, char **argv)
 {
     dir = argc > 1 ? argv[1] : "shots";
+    run();
+    fmt_now = "pcl";
+    return run() | bad;
+}
+
+static int run(void)
+{
     static rig_t r;
+    memset(&r, 0, sizeof(r));
     size_t n;
     uint8_t *png = make_png(1872, 1404, wave, &n);
     for (int i = 1; i <= 5; i++) {
@@ -106,7 +131,7 @@ int main(int argc, char **argv)
     }
     ffs_put(&r.fs, "writer/notes.md", TEXT, strlen(TEXT));
     ffs_put(&r.fs, "writer/shopping.txt", "milk\nbread\n", 11);
-    r.env = (pr_env_t){ { &r.fs, ffs_list }, rread, rcfg, { cap_post, &r.cap }, &r };
+    r.env = (pr_env_t){ { &r.fs, ffs_list }, rread, rcfg, { PJ_PWG, cap_post, &r.cap }, &r };
     pr_t p;
     pr_init(&p, &r.env);
     p.sel = 2;
@@ -117,7 +142,7 @@ int main(int argc, char **argv)
     shot(&p, 1, "preview-sketch-portrait");
     pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP);
     pr_run_print(&p);
-    save_pcl("sketch.pcl", &r.cap);
+    save_pcl(pwg_name("sketch"), &r.cap);
     shot(&p, 0, "result");
     free(r.cap.b);
     memset(&r.cap, 0, sizeof(r.cap));
@@ -127,7 +152,7 @@ int main(int argc, char **argv)
     shot(&p, 0, "preview-text");
     pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP);
     pr_run_print(&p);
-    save_pcl("text.pcl", &r.cap);
+    save_pcl(pwg_name("text"), &r.cap);
     strcpy(p.share[0], "1. With your phone on the same Wi-Fi open:");
     strcpy(p.share[1], "2. Then type the code:");
     strcpy(p.share[2], "http://print.local");

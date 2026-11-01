@@ -4,7 +4,7 @@ CC ?= gcc
 FW ?= $(HOME)/workspace/trmnl-fw-gb
 PY ?= $(HOME)/workspace/trmnl-fpv/.venv/bin/python
 CFLAGS = -Itest -std=c11 -O1 -g -Wall -Wextra -Werror -Wshadow -Isrc -Ihost -Igen -I$(FW)/include -fsanitize=address,undefined -fno-sanitize-recover=all
-CORE = src/pcl.c src/ipp.c src/imgfit.c src/textlay.c src/flist.c src/printjob.c src/pr.c src/prui.c src/pngio.c src/font.c src/gfx.c gen/fonts_gen.c
+CORE = src/pcl.c src/pwg.c src/ipp.c src/imgfit.c src/textlay.c src/flist.c src/printjob.c src/pr.c src/prui.c src/pngio.c src/font.c src/gfx.c gen/fonts_gen.c
 HOST = build/tbfw.o
 TESTS = $(patsubst test/%.c,build/%,$(wildcard test/test_*.c))
 
@@ -39,8 +39,11 @@ elf: gen/fonts_gen.c
 	  rm -rf $$d; done; [ $$ok = 1 ] || { echo "the linker crashed on every path: see Makefile"; exit 1; }; \
 	  ls -l build/elf/trmnl-print.elf; sha256sum build/elf/trmnl-print.elf
 .PHONY: elf
-# Looks at the PCL the app makes, with Artifex's gpcl6 in docker (no printer involved): make render, then view shots/r/*.png
+# Looks at what the app sends, rendered by software that is not ours (no printer involved): PWG raster through CUPS'
+# rastertopdf and ghostscript, PCL through Artifex's gpcl6. make render, then view shots/r/*.png
 render: shots
-	docker build -q -t tp-gpcl6 tools/gpcl >/dev/null
-	@mkdir -p shots/r; for j in sketch text; do docker run --rm -v $(CURDIR)/shots:/w tp-gpcl6 -dNOPAUSE -dBATCH -sDEVICE=pnggray -r150 -sOutputFile=/w/r/$$j-%d.png /w/$$j.pcl; done
+	@mkdir -p shots/r
+	docker run --rm -v $(CURDIR)/shots:/w debian:12 sh -c 'apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends cups-filters ghostscript >/dev/null 2>&1; \
+	  for j in sketch text; do /usr/lib/cups/filter/rastertopdf 1 u t 1 "" /w/$$j.pwg > /w/r/$$j.pdf 2>/dev/null; gs -q -dNOPAUSE -dBATCH -sDEVICE=pnggray -r110 -sOutputFile=/w/r/$$j-pwg-%d.png /w/r/$$j.pdf; done; chmod -R a+rw /w/r'
+	@docker build -q -t tp-gpcl6 tools/gpcl >/dev/null; for j in sketch text; do docker run --rm -v $(CURDIR)/shots:/w tp-gpcl6 -dNOPAUSE -dBATCH -sDEVICE=pnggray -r110 -sOutputFile=/w/r/$$j-pcl-%d.png /w/$$j.pcl; done
 .PHONY: render

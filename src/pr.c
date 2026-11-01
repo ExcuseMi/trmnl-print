@@ -128,8 +128,12 @@ void pr_run_print(pr_t *p)
     char printer[80];
     pr_printer(p, printer, sizeof(printer));
     const fl_entry_t *e = &p->list.e[p->sel - 1];
-    int rc = e->kind == FL_PNG ? pj_print_png(&p->env->net, printer, p->data, p->data_n, &p->res)
-                               : pj_print_text(&p->env->net, printer, (const char *)p->data, p->data_n, &p->res);
+    pj_net_t net = p->env->net;
+    char fmt[8];
+    int fn = p->env->cfg_get(p->env->u, "format", fmt, (int)sizeof(fmt) - 1);
+    net.format = fn == 3 && !memcmp(fmt, "pcl", 3) ? PJ_PCL : PJ_PWG; /* pwg unless the setting says pcl */
+    int rc = e->kind == FL_PNG ? pj_print_png(&net, printer, p->data, p->data_n, &p->res)
+                               : pj_print_text(&net, printer, (const char *)p->data, p->data_n, &p->res);
     (void)rc;
     set_note(p, p->res.msg);
     p->mode = PR_RESULT;

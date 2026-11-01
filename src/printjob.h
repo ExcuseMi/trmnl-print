@@ -18,9 +18,13 @@ extern size_t pj_job_bytes; /* the job buffer size, PJ_JOB_BYTES; changed by tes
 #define PJ_NET_TIMEOUT (-2)
 #define PJ_NET_NO_WIFI (-3)
 
-/* POSTs body (Content-Type application/ipp) to url; returns the HTTP status (> 0), or a PJ_NET_* error. The answer's
+/* The connection: POSTs body (Content-Type application/ipp) to url; returns the HTTP status (> 0), or a PJ_NET_* error. The answer's
    body goes to resp (cap bytes), its size to *rn. */
+/* What a job carries */
+enum { PJ_PWG, PJ_PCL };
+
 typedef struct {
+    int format; /* PJ_PWG (default, 0) or PJ_PCL */
     int (*post)(void *u, const char *url, const void *body, size_t n, uint8_t *resp, size_t cap, size_t *rn);
     void *u;
 } pj_net_t;
