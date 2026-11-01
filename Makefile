@@ -39,3 +39,8 @@ elf: gen/fonts_gen.c
 	  rm -rf $$d; done; [ $$ok = 1 ] || { echo "the linker crashed on every path: see Makefile"; exit 1; }; \
 	  ls -l build/elf/trmnl-print.elf; sha256sum build/elf/trmnl-print.elf
 .PHONY: elf
+# Looks at the PCL the app makes, with Artifex's gpcl6 in docker (no printer involved): make render, then view shots/r/*.png
+render: shots
+	docker build -q -t tp-gpcl6 tools/gpcl >/dev/null
+	@mkdir -p shots/r; for j in sketch text; do docker run --rm -v $(CURDIR)/shots:/w tp-gpcl6 -dNOPAUSE -dBATCH -sDEVICE=pnggray -r150 -sOutputFile=/w/r/$$j-%d.png /w/$$j.pcl; done
+.PHONY: render

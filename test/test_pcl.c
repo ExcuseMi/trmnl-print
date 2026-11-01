@@ -57,6 +57,14 @@ static void packbits_roundtrip(void)
         CHECK(k == (long)n);
         CHECK(k == (long)n && !memcmp(in, dec, n));
     }
+    for (size_t n = 120; n < 520; n++) { /* runs across the 128 limit, exactly as the standard cuts them */
+        uint8_t *in = calloc(n, 1), *enc = malloc(n + n / 128 + 2), *dec = malloc(n);
+        size_t m = packbits_encode(in, n, enc);
+        CHECK(m == 2 * ((n + 127) / 128));
+        CHECK(packbits_decode(enc, m, dec, n) == (long)n && !memcmp(in, dec, n));
+        for (size_t i = 0; i < m; i += 2) CHECK((int8_t)enc[i] >= -127);   /* -128 is no run: the standard keeps it free */
+        free(in), free(enc), free(dec);
+    }
     uint8_t white[310] = { 0 }, enc[320];
     CHECK(packbits_encode(white, sizeof(white), enc) == 6); /* 128 + 128 + 54 as three runs */
     uint8_t one = 9, e1[4];

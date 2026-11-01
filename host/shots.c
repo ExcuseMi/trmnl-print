@@ -60,8 +60,8 @@ static int cap_post(void *u, const char *url, const void *body, size_t n, uint8_
 
 static void save_pcl(const char *name, cap_t *c)
 {
-    uint8_t hb[300];
-    size_t hl = ipp_print_job_header(hb, sizeof(hb), "printer", 631, "tiny-paper");
+    size_t hl = 0; /* the IPP header ends at the end-of-attributes tag; the PCL job starts at its ESC E */
+    while (hl + 1 < c->n && !(c->b[hl] == 0x1b && c->b[hl + 1] == 'E')) hl++;
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", dir, name);
     FILE *f = fopen(path, "wb");

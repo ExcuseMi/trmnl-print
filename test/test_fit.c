@@ -116,6 +116,24 @@ static void thin_line_survives_downscale(void)
     free(px);
 }
 
+static void half_covered_is_ink(void)
+{
+    /* columns alternate black, white; shrunk by 0.56 a destination pixel covers 1 or 2 columns, mostly 2 (one black
+       of two: exactly half, which counts as ink) */
+    int w = 4096, h = 4096, stride = w / 8;
+    uint8_t *px = malloc((size_t)stride * (size_t)h);
+    memset(px, 0xaa, (size_t)stride * (size_t)h); /* 1 = white at even columns */
+    img_t im = { px, w, h, stride };
+    fit_t f;
+    fit_compute(w, h, PCL_PAGE_W, PCL_PAGE_H, &f);
+    uint8_t row[PCL_PAGE_W / 8];
+    fit_row(&im, &f, f.h / 2, row);
+    int inks = 0;
+    for (int x = 0; x < f.w; x++) inks += ink_at(row, x);
+    CHECK(inks * 10 >= f.w * 6);
+    free(px);
+}
+
 static void dims(void)
 {
     size_t n;
@@ -136,6 +154,7 @@ int main(void)
     sizes();
     rows();
     thin_line_survives_downscale();
+    half_covered_is_ink();
     dims();
     return CHECK_DONE("test_fit");
 }

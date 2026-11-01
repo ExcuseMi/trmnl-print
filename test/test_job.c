@@ -143,11 +143,20 @@ static void text_job(void)
     printer_init(&pr);
     CHECK(pj_print_text(&net, "p", s, strlen(s), &r) == 0);
     CHECK(r.pages == pages_one_job && pr.posts == r.jobs && r.jobs == 2);
+    int pages_seen = 0;
     for (int i = 0; i < pr.posts && i < 8; i++) {
         CHECK(pr.len[i] <= 320000);
         const uint8_t *b = pr.body[i];
         CHECK(!memcmp(b + pr.len[i] - 2, "\x1b" "E", 2));       /* each job ends with its reset */
+        int starts = 0, ends = 0;                                /* every page in it is whole: as many ends as starts */
+        for (size_t k = 0; k + 7 <= pr.len[i]; k++) {
+            starts += !memcmp(b + k, "\x1b*t300R", 7);
+            ends += !memcmp(b + k, "\x1b*rB\f", 5);
+        }
+        CHECK(starts == ends && starts >= 1);
+        pages_seen += ends;
     }
+    CHECK(pages_seen == r.pages);
     printer_free(&pr);
     /* the printer fails on the second job: the run stops there with the words, and says how far it got */
     printer_init(&pr);
