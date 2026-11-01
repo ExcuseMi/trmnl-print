@@ -42,6 +42,16 @@ static inline void printer_free(printer_t *p)
     for (int i = 0; i < 8; i++) free(p->body[i]);
 }
 
+/* A printer from "host[:port][/path]" for the tests (a few static slots; a bad address gives an empty host) */
+static inline const pj_printer_t *tp(const char *addr)
+{
+    static pj_printer_t slot[4];
+    static int next;
+    pj_printer_t *p = &slot[next++ & 3];
+    if (pj_printer_parse(addr, p) < 0) memset(p, 0, sizeof(*p));
+    return p;
+}
+
 /* ---- a file system: "group/name" files ---- */
 #define FS_N 256
 typedef struct {

@@ -29,12 +29,12 @@ static void attr(wr_t *w, int tag, const char *name, const char *val)
     wput(w, val, lv);
 }
 
-size_t ipp_print_job_header(uint8_t *out, size_t cap, const char *host, int port, const char *job_name, const char *mime)
+size_t ipp_print_job_header(uint8_t *out, size_t cap, const char *host, int port, const char *path, const char *job_name, const char *mime)
 {
     wr_t w = { out, cap, 0, 0 };
-    char uri[160];
-    size_t hl = strlen(host);
-    if (!hl || hl > 100 || port < 1 || port > 65535) return 0;
+    char uri[200];
+    size_t hl = strlen(host), pl = path && path[0] ? strlen(path) : sizeof("ipp/print") - 1;
+    if (!hl || hl > 100 || pl > 60 || port < 1 || port > 65535) return 0;
     char d[6];
     int m = 0;
     for (int v = port; v; v /= 10) d[m++] = (char)('0' + v % 10);
@@ -43,7 +43,9 @@ size_t ipp_print_job_header(uint8_t *out, size_t cap, const char *host, int port
     memcpy(uri + u, host, hl), u += hl;
     uri[u++] = ':';
     while (m) uri[u++] = d[--m];
-    memcpy(uri + u, "/ipp/print", 11); /* with the NUL */
+    uri[u++] = '/';
+    memcpy(uri + u, path && path[0] ? path : "ipp/print", pl), u += pl;
+    uri[u] = 0;
     put16(&w, 0x0101); /* IPP 1.1 */
     put16(&w, 0x0002); /* Print-Job */
     put16(&w, 0); put16(&w, 1); /* request id 1 */

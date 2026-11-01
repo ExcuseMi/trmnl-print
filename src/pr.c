@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "pr.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "imgfit.h"
@@ -28,6 +29,7 @@ void pr_init(pr_t *p, const pr_env_t *env)
 {
     memset(p, 0, sizeof(*p));
     p->env = env;
+    prs_load(p);
     pr_rescan(p);
 }
 
@@ -45,13 +47,12 @@ void pr_rescan(pr_t *p)
 
 void pr_printer(const pr_t *p, char *out, size_t cap)
 {
-    int n = p->env->cfg_get(p->env->u, "printer", out, (int)cap - 1);
-    if (n <= 0 || (size_t)n >= cap) {
-        size_t d = strlen(PR_DEFAULT_PRINTER);
-        memcpy(out, PR_DEFAULT_PRINTER, d + 1);
-        return;
-    }
-    out[n] = 0;
+    out[0] = 0;
+    if (!p->have_def) return;
+    char a[100];
+    pj_printer_addr(&p->def, a, sizeof(a));
+    if (p->def.name[0]) snprintf(out, cap, "%s  %s", p->def.name, a);
+    else snprintf(out, cap, "%s", a);
 }
 
 /* Back to where the person came from: the caller when there is one (the glue launches it), else the list */
@@ -128,6 +129,17 @@ static int path_ok(const char *s)
 void pr_start_arg(pr_t *p, const char *arg)
 {
     if (!arg || !arg[0]) return;
+    if (!strncmp(arg, "setup:", 6)) { /* an app sends the person to set a printer up, and gets the screen back */
+        size_t k = strlen(arg + 6);
+        if (!name_ok(arg + 6, k)) {
+            set_note(p, "Print was started with an argument it does not understand");
+            return;
+        }
+        memcpy(p->caller, arg + 6, k + 1);
+        p->setup = 1;
+        prs_open(p, PR_LIST);
+        return;
+    }
     const char *colon = strchr(arg, ':');
     if (!colon || !name_ok(arg, (size_t)(colon - arg))) {
         set_note(p, "Print was started with an argument it does not understand");
@@ -165,7 +177,7 @@ void pr_touch(pr_t *p, int zone, int gesture)
         else if (zone == APP_TOUCH_LEFT && p->sel > 0) p->sel--;
         else if (zone == APP_TOUCH_RIGHT && p->sel + 1 < total) p->sel++;
         else if (zone == APP_TOUCH_MIDDLE) {
-            if (p->sel == 0) p->mode = PR_SETTINGS, p->settings_req = 1;
+            if (p->sel == 0) prs_open(p, PR_LIST);
             else open_preview(p);
         }
         break;
@@ -174,17 +186,23 @@ void pr_touch(pr_t *p, int zone, int gesture)
         if (zone == APP_TOUCH_LEFT) {
             if (p->caller[0]) go_back(p);
             else drop_data(p), p->mode = PR_LIST;
-        } else if (zone == APP_TOUCH_MIDDLE) p->mode = PR_PRINTING, p->print_req = 1;
+        } else if (zone == APP_TOUCH_MIDDLE) {
+            if (p->have_def) p->test = 0, p->mode = PR_PRINTING, p->print_req = 1;
+            else prs_open(p, PR_PREVIEW); /* no printer yet: find one first, then back here to print */
+        }
         else if (zone == APP_TOUCH_RIGHT && !p->caller[0] && p->sel < p->list.n) p->sel++, open_preview(p);
         break;
     case PR_RESULT:
         if (gesture != APP_GESTURE_TAP) break;
-        if (p->caller[0]) go_back(p); /* printed, or not: back in the app the person came from */
+        if (p->test) p->test = 0, p->mode = PR_PICK;
+        else if (p->caller[0]) go_back(p); /* printed, or not: back in the app the person came from */
         else p->mode = p->data ? PR_PREVIEW : PR_LIST;
         break;
     case PR_SETTINGS:
-        if (gesture == APP_GESTURE_TAP) p->mode = PR_LIST, p->settings_req = -1;
+        if (gesture == APP_GESTURE_TAP) p->settings_req = -1, prs_settings_closed(p);
         break;
+    case PR_PICK:
+    case PR_TESTASK: prs_touch(p, zone, gesture); break;
     default: break;
     }
 }
@@ -192,15 +210,18 @@ void pr_touch(pr_t *p, int zone, int gesture)
 void pr_run_print(pr_t *p)
 {
     p->print_req = 0;
-    char printer[80];
-    pr_printer(p, printer, sizeof(printer));
+    if (p->test) {
+        prs_print_test(p);
+        set_note(p, p->res.msg);
+        p->mode = PR_RESULT;
+        return;
+    }
     const fl_entry_t *e = &p->cur;
     pj_net_t net = p->env->net;
-    char fmt[8];
-    int fn = p->env->cfg_get(p->env->u, "format", fmt, (int)sizeof(fmt) - 1);
-    net.format = fn == 3 && !memcmp(fmt, "pcl", 3) ? PJ_PCL : PJ_PWG; /* pwg unless the setting says pcl */
-    int rc = e->kind == FL_PNG ? pj_print_png(&net, printer, p->data, p->data_n, &p->res)
-                               : pj_print_text(&net, printer, (const char *)p->data, p->data_n, &p->res);
+    net.format = p->def.format;
+    int rc = !p->have_def ? (snprintf(p->res.msg, sizeof(p->res.msg), "No printer yet: set one up first"), -1)
+             : e->kind == FL_PNG ? pj_print_png(&net, &p->def, p->data, p->data_n, &p->res)
+                                 : pj_print_text(&net, &p->def, (const char *)p->data, p->data_n, &p->res);
     (void)rc;
     set_note(p, p->res.msg);
     p->mode = PR_RESULT;
@@ -211,6 +232,16 @@ static void put_s(char *dst, size_t cap, const char *s)
     size_t n = strlen(dst);
     while (*s && n + 1 < cap) dst[n++] = *s++;
     dst[n] = 0;
+}
+
+void pr_run_find(pr_t *p)
+{
+    p->find_req = 0;
+    p->nfound = 0;
+    p->psel = 0;
+    p->note[0] = 0;
+    prs_search(p);
+    p->mode = PR_PICK;
 }
 
 void pr_set_share(pr_t *p, int rc, const app_webshare_status_t *st)

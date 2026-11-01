@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "printjob.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "imgfit.h"
@@ -42,34 +43,12 @@ static void say(pj_result_t *r, const char *a, const char *b, int num)
     r->msg[n] = 0;
 }
 
-int pj_parse_printer(const char *s, char *host, size_t cap, int *port)
-{
-    size_t n = strlen(s), hl = n;
-    const char *c = strrchr(s, ':');
-    *port = PJ_DEFAULT_PORT;
-    if (c) {
-        hl = (size_t)(c - s);
-        long p = 0;
-        if (!c[1]) return -1;
-        for (const char *q = c + 1; *q; q++) {
-            if (*q < '0' || *q > '9' || (p = p * 10 + (*q - '0')) > 65535) return -1;
-        }
-        if (p < 1) return -1;
-        *port = (int)p;
-    }
-    if (hl == 0 || hl >= cap) return -1;
-    for (size_t i = 0; i < hl; i++)
-        if (s[i] <= ' ' || s[i] == '/') return -1;
-    memcpy(host, s, hl);
-    host[hl] = 0;
-    return 0;
-}
-
 typedef struct {
     const pj_net_t *net;
     char host[64];
     int port;
-    char url[96];
+    char path[48];
+    char url[160];
     buf_t b;
     size_t header;
     size_t mark; /* start of the page being written */
@@ -77,27 +56,24 @@ typedef struct {
     uint8_t resp[160];
 } job_t;
 
-static int job_open(job_t *j, const pj_net_t *net, const char *printer, pj_result_t *r)
+static int job_open(job_t *j, const pj_net_t *net, const pj_printer_t *printer, pj_result_t *r)
 {
     memset(j, 0, sizeof(*j));
     j->net = net;
     j->r = r;
-    if (pj_parse_printer(printer, j->host, sizeof(j->host), &j->port) < 0) return say(r, "Printer address is not valid: ", printer, -1), -1;
+    pj_printer_t chk;
+    char addr[128];
+    pj_printer_addr(printer, addr, sizeof(addr));
+    if (!printer->host[0] || pj_printer_parse(addr, &chk) < 0) return say(r, "Printer address is not valid: ", printer->host, -1), -1;
+    memcpy(j->host, printer->host, sizeof(j->host));
+    j->port = printer->port;
+    snprintf(j->path, sizeof(j->path), "%s", printer->path[0] ? printer->path : PJ_DEFAULT_PATH);
     size_t cap = pj_job_bytes;
     j->b.p = malloc(cap);
     if (!j->b.p && cap > PJ_JOB_BYTES_SMALL) j->b.p = malloc(cap = PJ_JOB_BYTES_SMALL);
     if (!j->b.p) return say(r, "Not enough memory to print", "", -1), -1;
     j->b.cap = cap;
-    /* http://host:port/ipp/print: the HTTP side of the IPP request */
-    char d[6];
-    int m = 0;
-    for (int v = j->port; v; v /= 10) d[m++] = (char)('0' + v % 10);
-    size_t u = 0, hl = strlen(j->host);
-    memcpy(j->url, "http://", 7), u = 7;
-    memcpy(j->url + u, j->host, hl), u += hl;
-    j->url[u++] = ':';
-    while (m) j->url[u++] = d[--m];
-    memcpy(j->url + u, "/ipp/print", 11);
+    if (snprintf(j->url, sizeof(j->url), "http://%s:%d/%s", j->host, j->port, j->path) >= (int)sizeof(j->url)) return free(j->b.p), say(r, "Printer address is too long", "", -1), -1;
     return 0;
 }
 
@@ -105,7 +81,7 @@ static int job_open(job_t *j, const pj_net_t *net, const char *printer, pj_resul
 static void job_start(job_t *j)
 {
     pcl_out_t o = { buf_write, &j->b, 0, 0 };
-    j->b.n = ipp_print_job_header(j->b.p, j->b.cap, j->host, j->port, "tiny-paper", j->net->format == PJ_PCL ? IPP_PCL : IPP_PWG);
+    j->b.n = ipp_print_job_header(j->b.p, j->b.cap, j->host, j->port, j->path, "tiny-paper", j->net->format == PJ_PCL ? IPP_PCL : IPP_PWG);
     if (j->net->format == PJ_PCL) pcl_job_begin(&o);
     else pwg_job_begin(&o);
     j->header = j->b.n;
@@ -168,29 +144,42 @@ static int pic_row(void *u, int y, uint8_t *row)
     return 0;
 }
 
-int pj_print_png(const pj_net_t *net, const char *printer, const uint8_t *file, size_t n, pj_result_t *r)
+static int print_img(const pj_net_t *net, const pj_printer_t *printer, uint8_t *px, int w, int h, int stride, pj_result_t *r)
+{
+    pic_t pic;
+    pic.im.w = w, pic.im.h = h, pic.im.stride = stride;
+    pic.im.px = px;
+    int pwg = net->format != PJ_PCL;
+    fit_compute(w, h, pwg ? PWG_PAGE_W : PCL_PAGE_W, pwg ? PWG_PAGE_H : PCL_PAGE_H, &pic.f);
+    job_t j;
+    if (job_open(&j, net, printer, r) < 0) return -1;
+    job_start(&j);
+    pcl_region_t reg = { pic.f.x, pic.f.y, pic.f.w, pic.f.h, pic_row, &pic };
+    int rc = job_page(&j, &reg, 1);
+    if (rc == 0) rc = job_send(&j);
+    return pj_done(&j, rc);
+}
+
+int pj_print_png(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *file, size_t n, pj_result_t *r)
 {
     memset(r, 0, sizeof(*r));
     int w, h;
     if (png_dims(file, n, &w, &h) < 0) return say(r, "Not a PNG this app can read", "", -1), -1;
     int stride = (w + 7) / 8;
     if ((size_t)stride * (size_t)h > IMG_MAX_BYTES) return say(r, "The picture is too big", "", -1), -1;
-    pic_t pic;
-    pic.im.w = w, pic.im.h = h, pic.im.stride = stride;
     uint8_t *px = malloc((size_t)stride * (size_t)h);
     if (!px) return say(r, "Not enough memory to print", "", -1), -1;
     if (png_decode(file, n, px, w, h, stride) < 0) return free(px), say(r, "Not a 1-bit PNG (only Sketch pictures are read)", "", -1), -1;
-    pic.im.px = px;
-    int pwg = net->format != PJ_PCL;
-    fit_compute(w, h, pwg ? PWG_PAGE_W : PCL_PAGE_W, pwg ? PWG_PAGE_H : PCL_PAGE_H, &pic.f);
-    job_t j;
-    if (job_open(&j, net, printer, r) < 0) return free(px), -1;
-    job_start(&j);
-    pcl_region_t reg = { pic.f.x, pic.f.y, pic.f.w, pic.f.h, pic_row, &pic };
-    int rc = job_page(&j, &reg, 1);
-    if (rc == 0) rc = job_send(&j);
+    int rc = print_img(net, printer, px, w, h, stride, r);
     free(px);
-    return pj_done(&j, rc);
+    return rc;
+}
+
+int pj_print_bitmap(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *px, int w, int h, int stride, pj_result_t *r)
+{
+    memset(r, 0, sizeof(*r));
+    if (!px || w < 8 || h < 1 || stride < (w + 7) / 8 || (size_t)stride * (size_t)h > IMG_MAX_BYTES) return say(r, "The page could not be made", "", -1), -1;
+    return print_img(net, printer, (uint8_t *)px, w, h, stride, r);
 }
 
 typedef struct {
@@ -213,7 +202,7 @@ static int txt_row(void *u, int y, uint8_t *row)
 
 #define BAND_ROWS 64
 
-int pj_print_text(const pj_net_t *net, const char *printer, const char *text, size_t n, pj_result_t *r)
+int pj_print_text(const pj_net_t *net, const pj_printer_t *printer, const char *text, size_t n, pj_result_t *r)
 {
     memset(r, 0, sizeof(*r));
     if (n == 0) return say(r, "The file is empty", "", -1), -1;

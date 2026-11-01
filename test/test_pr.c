@@ -1,73 +1,7 @@
 #define _GNU_SOURCE
 /* The controller: list paging, preview, print flow, the printer setting, errors on the screen. SPDX-License-Identifier: MIT */
 #include "check.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "pr.h"
-#include "tbfw.h"
-#include "util.h"
-
-typedef struct {
-    ffs_t fs;
-    printer_t pr;
-    char printer[64], format[8];
-    pr_env_t env;
-} rig_t;
-
-static int rig_cfg(void *u, const char *k, char *b, int cap)
-{
-    rig_t *r = u;
-    const char *v = !strcmp(k, "printer") ? r->printer : !strcmp(k, "format") ? r->format : "";
-    if (!v[0]) return -1;
-    int n = (int)strlen(v);
-    if (n > cap) n = cap;
-    memcpy(b, v, (size_t)n);
-    return n;
-}
-static int rig_read(void *u, const fl_entry_t *e, uint8_t **b, size_t *sz) { return ffs_read(&((rig_t *)u)->fs, e, b, sz); }
-
-static void paint(uint8_t *px, int stride, int w, int h)
-{
-    for (int i = 0; i < w && i < h; i++) set_ink(px, stride, i, i);
-}
-
-static void rig_new(rig_t *r)
-{
-    memset(r, 0, sizeof(*r));
-    printer_init(&r->pr);
-    size_t n;
-    uint8_t *png = make_png(400, 300, paint, &n);
-    for (int i = 1; i <= 12; i++) {
-        char p[64];
-        snprintf(p, sizeof(p), "sketch/sk%04d.png", i);
-        ffs_put(&r->fs, p, png, n);
-    }
-    free(png);
-    ffs_put(&r->fs, "writer/diary.md", "# Diary\n\nToday I wrote a few lines.\n", 36);
-    ffs_put(&r->fs, "writer/broken.txt", "x", 1);
-    r->fs.f[r->fs.count - 1].unreadable = 1;
-    ffs_put(&r->fs, "sketch/sk0099.png", "this is not a png at all, just text", 35);
-    r->env.files = (fl_fs_t){ &r->fs, ffs_list, 0 };
-    r->env.read = rig_read;
-    r->env.cfg_get = rig_cfg;
-    r->env.net = (pj_net_t){ PJ_PWG, fake_post, &r->pr };
-    r->env.u = r;
-}
-static void rig_free(rig_t *r)
-{
-    ffs_free(&r->fs);
-    printer_free(&r->pr);
-}
-
-static int find_sel(pr_t *p, const char *name)
-{
-    for (int i = 0; i < p->list.n; i++)
-        if (!strcmp(p->list.e[i].name, name)) return i + 1;
-    return -1;
-}
-
-static void tap(pr_t *p, int zone) { pr_touch(p, zone, APP_GESTURE_TAP); }
+#include "rig.h"
 
 static void navigation(void)
 {
@@ -96,24 +30,25 @@ static void navigation(void)
     rig_free(&r);
 }
 
-static void settings_row(void)
+static void printer_row(void)
 {
     static rig_t r;
     rig_new(&r);
     pr_t p;
     pr_init(&p, &r.env);
-    char a[80];
+    char a[160];
     pr_printer(&p, a, sizeof(a));
-    CHECK(!strcmp(a, PR_DEFAULT_PRINTER));
-    strcpy(r.printer, "10.0.0.7:9631");
+    CHECK(!strcmp(a, "Test printer  10.0.0.7"));
+    tap(&p, APP_TOUCH_MIDDLE);                              /* on the printer row, with a default: the menu */
+    CHECK(p.mode == PR_PICK && !p.find_req && r.browses == 0);
+    pr_free(&p);
+    rig_default(&r, "");                                    /* no default printer: nothing is assumed */
+    r.cfg_n = 0;
+    pr_init(&p, &r.env);
     pr_printer(&p, a, sizeof(a));
-    CHECK(!strcmp(a, "10.0.0.7:9631"));
-    tap(&p, APP_TOUCH_MIDDLE);                              /* on the printer row */
-    CHECK(p.mode == PR_SETTINGS && p.settings_req == 1);
-    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_SWIPE_LEFT); /* swipes do nothing here */
-    CHECK(p.mode == PR_SETTINGS);
-    tap(&p, APP_TOUCH_LEFT);
-    CHECK(p.mode == PR_LIST && p.settings_req == -1);
+    CHECK(!a[0] && !p.have_def);
+    tap(&p, APP_TOUCH_MIDDLE);
+    CHECK(p.mode == PR_FINDING && p.find_req == 1);         /* looks at once */
     pr_free(&p);
     rig_free(&r);
 }
@@ -124,7 +59,6 @@ static void preview_and_print(void)
     rig_new(&r);
     pr_t p;
     pr_init(&p, &r.env);
-    strcpy(r.printer, "10.0.0.7");
     p.sel = find_sel(&p, "sk0012.png");
     CHECK(p.sel == 2);                                      /* the newest sketch first (sk0099 is the not-a-PNG one) */
     p.sel = find_sel(&p, "sk0012.png");
@@ -137,15 +71,16 @@ static void preview_and_print(void)
     CHECK(!strcmp(p.note, "Sent 1 page to the printer"));
     CHECK(!strcmp(r.pr.url, "http://10.0.0.7:631/ipp/print"));
     CHECK(memmem(r.pr.body[0], r.pr.len[0], "image/pwg-raster", 16));        /* the default format */
-    strcpy(r.format, "pcl");
+    rig_default(&r, "host=10.0.0.7\nformat=pcl\n");
+    prs_load(&p);
     p.mode = PR_PREVIEW, p.print_req = 1;
     pr_run_print(&p);
-    CHECK(memmem(r.pr.body[1], r.pr.len[1], "application/octet-stream", 24)); /* the setting "format: pcl" */
-    strcpy(r.format, "junk");
+    CHECK(memmem(r.pr.body[1], r.pr.len[1], "application/octet-stream", 24)); /* the file says format=pcl */
+    rig_default(&r, "host=10.0.0.7\nformat=junk\n");
+    prs_load(&p);
     p.mode = PR_PREVIEW, p.print_req = 1;
     pr_run_print(&p);
     CHECK(memmem(r.pr.body[2], r.pr.len[2], "image/pwg-raster", 16));        /* anything else is the default */
-    r.format[0] = 0;
     tap(&p, APP_TOUCH_MIDDLE);
     CHECK(p.mode == PR_PREVIEW);                            /* back to the preview */
     tap(&p, APP_TOUCH_RIGHT);                               /* next file */
@@ -215,7 +150,7 @@ static void drawing(void)
         tbfw_layout(orient, &bar);
         gfx_t g;
         gfx_init(&g, fb, 1872, 1404, 1872 / 8, orient);
-        for (int mode = 0; mode < 5; mode++) {
+        for (int mode = 0; mode < 8; mode++) {
             pr_free(&p);
             p.mode = mode;
             p.sel = mode == PR_PREVIEW ? 2 : mode == PR_LIST ? 3 : 0;
@@ -285,7 +220,7 @@ int main(void)
 {
     start_argument();
     navigation();
-    settings_row();
+    printer_row();
     preview_and_print();
     errors_on_screen();
     drawing();

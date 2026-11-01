@@ -54,10 +54,9 @@ static void draw_list(const pr_t *p, gfx_t *g)
         if (on) gfx_fill_rect(g, 30, (float)(y - 56), (float)(g->W - 30), (float)(y + 30), BLK);
         int c = on ? WHT : BLK;
         if (i == 0) {
-            char pr[80], line[120] = "Printer: ";
+            char pr[160], line[200] = "Printer: ";
             pr_printer(p, pr, sizeof(pr));
-            cat(line, sizeof(line), pr);
-            cat(line, sizeof(line), "  (middle: change on the phone)");
+            cat(line, sizeof(line), pr[0] ? pr : "none yet (touch the middle to set one up)");
             text(g, f, 50, y, line, c);
             continue;
         }
@@ -72,10 +71,41 @@ static void draw_list(const pr_t *p, gfx_t *g)
     if (p->note[0]) text(g, small, 50, g->H - 30, p->note, BLK);
 }
 
+static void draw_pick(const pr_t *p, gfx_t *g)
+{
+    const font_face_t *f = face(0, 46), *small = face(0, 34);
+    text(g, face(1, 64), 50, 100, "Printers", BLK);
+    char d[160] = "Default: ";
+    if (p->have_def) {
+        pr_printer(p, d + 9, sizeof(d) - 9);
+    } else cat(d, sizeof(d), "none yet");
+    text(g, small, 50, 150, d, BLK);
+    int total = prs_items(p), first = p->psel / PR_ROWS * PR_ROWS, y = 230;
+    for (int i = first; i < first + PR_ROWS && i < total; i++, y += 90) {
+        int on = i == p->psel, k = prs_kind(p, i);
+        if (on) gfx_fill_rect(g, 30, (float)(y - 56), (float)(g->W - 30), (float)(y + 30), BLK);
+        int c = on ? WHT : BLK;
+        if (k == PK_FOUND) {
+            const pj_printer_t *f1 = &p->found[i];
+            char a[100];
+            pj_printer_addr(f1, a, sizeof(a));
+            text(g, f, 50, y, f1->name[0] ? f1->name : a, c);
+            text(g, small, g->W - 50 - text_w(small, a), y, a, c);
+        } else {
+            text(g, f, 50, y, k == PK_FIND ? "Find printers" : k == PK_PHONE ? "Enter address on the phone" : k == PK_TEST ? "Test page" : "Back", c);
+        }
+    }
+    if (p->note[0]) text(g, small, 50, g->H - 30, p->note, BLK);
+}
+
 static void draw_preview(const pr_t *p, gfx_t *g)
 {
     const fl_entry_t *e = &p->cur;
     const font_face_t *small = face(0, 34);
+    char to[170] = "Prints on: ";
+    if (p->have_def) pr_printer(p, to + 11, sizeof(to) - 11);
+    else cat(to, sizeof(to), "no printer yet (Print will look for one)");
+    text(g, small, g->W - 50 - text_w(small, to), 70, to, BLK);
     text(g, face(1, 46), 50, 70, e->name, BLK);
     text(g, small, 50 + text_w(face(1, 46), e->name) + 30, 70, e->group, BLK);
     int top = 100, bottom = g->H - 20;
@@ -138,12 +168,24 @@ void pr_draw(const pr_t *p, gfx_t *g, const app_touchbar_t *bar)
         int y = 220;
         for (int i = 0; i < 4; i++)
             if (p->share[i][0]) text(g, face(i == 2 ? 1 : 0, i == 2 ? 64 : 46), 50, y, p->share[i], BLK), y += i == 2 ? 110 : 70;
+        text(g, face(0, 34), 50, y + 40, "The printer's address is in its network settings,", BLK);
+        text(g, face(0, 34), 50, y + 85, "or on the network report it prints (menu: Network).", BLK);
+        break;
+    }
+    case PR_FINDING: draw_msg(g, "Finding printers...", "Looking on your Wi-Fi network.", "This takes up to 15 seconds."); break;
+    case PR_PICK: draw_pick(p, g); break;
+    case PR_TESTASK: {
+        char a[160];
+        pr_printer(p, a, sizeof(a));
+        draw_msg(g, "Test page", "Print a test page on:", a);
         break;
     }
     default: break;
     }
     gfx_screen(g);
-    if (p->mode == PR_LIST) label(g, bar, APP_TOUCH_LEFT, "Up"), label(g, bar, APP_TOUCH_MIDDLE, p->sel ? "Open" : "Change"), label(g, bar, APP_TOUCH_RIGHT, "Down");
+    if (p->mode == PR_LIST) label(g, bar, APP_TOUCH_LEFT, "Up"), label(g, bar, APP_TOUCH_MIDDLE, p->sel ? "Open" : "Printer"), label(g, bar, APP_TOUCH_RIGHT, "Down");
+    else if (p->mode == PR_PICK) label(g, bar, APP_TOUCH_LEFT, "Up"), label(g, bar, APP_TOUCH_MIDDLE, "Choose"), label(g, bar, APP_TOUCH_RIGHT, "Down");
+    else if (p->mode == PR_TESTASK) label(g, bar, APP_TOUCH_LEFT, "Cancel"), label(g, bar, APP_TOUCH_MIDDLE, "Print");
     else if (p->mode == PR_PREVIEW) label(g, bar, APP_TOUCH_LEFT, "Back"), label(g, bar, APP_TOUCH_MIDDLE, "Print"), label(g, bar, APP_TOUCH_RIGHT, "Next file");
-    else if (p->mode != PR_PRINTING) label(g, bar, APP_TOUCH_MIDDLE, "OK");
+    else if (p->mode != PR_PRINTING && p->mode != PR_FINDING) label(g, bar, APP_TOUCH_MIDDLE, "OK");
 }

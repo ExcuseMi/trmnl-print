@@ -36,8 +36,40 @@ static int f_post(void *u, const char *url, const void *body, size_t n, uint8_t 
     return rs.status;
 }
 
+/* The default printer's file (src/printer.h): this app's own folder */
+static int cfg_read(void *u, char *buf, size_t cap)
+{
+    (void)u;
+    app_file_t *f = api->file_open(PJ_CFG_FILE, APP_FILE_READ);
+    if (!f) return -1;
+    size_t len = 0;
+    int k = 0;
+    while (len < cap && (k = api->file_read(f, buf + len, cap - len)) > 0) len += (size_t)k;
+    api->file_close(f);
+    return k < 0 ? -1 : (int)len;
+}
+
+static int cfg_write(void *u, const char *text, size_t n)
+{
+    (void)u;
+    app_file_t *f = api->file_open(PJ_CFG_FILE, APP_FILE_WRITE);
+    if (!f) return -1;
+    int k = api->file_write(f, text, n);
+    int c = api->file_close(f);
+    return k == (int)n && c >= 0 ? 0 : -1;
+}
+
+static int f_browse(void *u, app_browse_cb_t cb, void *ctx)
+{
+    (void)u;
+    if (api->size < APP_API_SLOT(56)) return APP_ENOTSUP;
+    return api->net_browse("_ipp._tcp", 15000, cb, ctx);
+}
+
+static int64_t f_now(void *u) { return (void)u, api->wall_time(); }
+
 static const app_setting_decl_t decl[] = {
-    { "printer", "Printer address (IP, or IP:port; the port is 631 if left out)", 0, 0, 64, APP_SETTING_TEXT },
+    { "printer", "Printer address if it is not found (IP, IP:port or IP:port/path; the port is 631 if left out)", 0, 0, 64, APP_SETTING_TEXT },
     { "format", "Page format (pwg: image/pwg-raster, pcl: PCL as octet-stream)", "pwg|pcl", 0, 0, APP_SETTING_CHOICE },
 };
 
@@ -65,6 +97,10 @@ int app_main(const app_api_t *a)
     env.u = &afs;
     env.cfg_get = cfg_get;
     env.net = (pj_net_t){ PJ_PWG, f_post, 0 };
+    env.cfg_read = cfg_read;
+    env.cfg_write = cfg_write;
+    env.browse = f_browse;
+    env.now = f_now;
     pr_init(&pr, &env);
     int sharing = 0, share_rc = 0;
     uint32_t sec = 0;
@@ -77,7 +113,7 @@ int app_main(const app_api_t *a)
     for (;;) {
         app_any_event_t u;
         int exit_now = 0, dirty = 0, full = 0;
-        uint32_t wait = pr.mode == PR_SETTINGS ? 500 : 5000;
+        uint32_t wait = pr.find_req || pr.print_req ? 0 : pr.mode == PR_SETTINGS ? 500 : 5000;
         for (int k = 0; k < 16 && !exit_now && api->input_poll(&u.ev, k ? 0 : wait); k++) {
             switch (u.ev.type) {
             case APP_EVENT_EXIT: exit_now = 1; break;
@@ -123,6 +159,12 @@ int app_main(const app_api_t *a)
             memcpy(keep, pr.share, sizeof(keep));
             pr_set_share(&pr, share_rc, &ws);
             if (memcmp(keep, pr.share, sizeof(keep))) dirty = 1;
+        }
+        if (pr.find_req) { /* show "Finding printers", then block while the network is searched */
+            pr_draw(&pr, &g, &bar);
+            push(1);
+            pr_run_find(&pr);
+            dirty = full = 1;
         }
         if (pr.print_req) { /* show "Printing", then block while the job goes out */
             pr_draw(&pr, &g, &bar);

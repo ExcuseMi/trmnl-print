@@ -5,10 +5,10 @@
 #define PRINTJOB_H
 #include <stddef.h>
 #include <stdint.h>
+#include "printer.h"
 
 #define PJ_JOB_BYTES (1024 * 1024)
 #define PJ_JOB_BYTES_SMALL (256 * 1024)
-#define PJ_DEFAULT_PORT 631
 #define PJ_MAX_PAGES 200
 
 extern size_t pj_job_bytes; /* the job buffer size, PJ_JOB_BYTES; changed by tests only */
@@ -34,9 +34,9 @@ typedef struct {
     int pages, jobs;
 } pj_result_t;
 
-/* "host" or "host:port"; port defaults to 631. 0, or < 0 for an empty or bad address */
-int pj_parse_printer(const char *s, char *host, size_t cap, int *port);
 /* Each returns 0 when all pages were accepted, else < 0 with r->msg set. */
-int pj_print_png(const pj_net_t *net, const char *printer, const uint8_t *file, size_t n, pj_result_t *r);
-int pj_print_text(const pj_net_t *net, const char *printer, const char *text, size_t n, pj_result_t *r);
+int pj_print_png(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *file, size_t n, pj_result_t *r);
+int pj_print_text(const pj_net_t *net, const pj_printer_t *printer, const char *text, size_t n, pj_result_t *r);
+/* A 1-bit picture (1 = white, `stride` bytes a row), fitted to the page like a PNG; for pages the app draws itself */
+int pj_print_bitmap(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *px, int w, int h, int stride, pj_result_t *r);
 #endif
