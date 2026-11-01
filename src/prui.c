@@ -74,7 +74,7 @@ static void draw_list(const pr_t *p, gfx_t *g)
 
 static void draw_preview(const pr_t *p, gfx_t *g)
 {
-    const fl_entry_t *e = &p->list.e[p->sel - 1];
+    const fl_entry_t *e = &p->cur;
     const font_face_t *small = face(0, 34);
     text(g, face(1, 46), 50, 70, e->name, BLK);
     text(g, small, 50 + text_w(face(1, 46), e->name) + 30, 70, e->group, BLK);

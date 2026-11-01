@@ -240,8 +240,50 @@ static void drawing(void)
     rig_free(&r);
 }
 
+static void start_argument(void)
+{
+    static rig_t r;
+    rig_new(&r);
+    pr_t p;
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "sketch:sk0003.png"); /* straight on the preview, Next file is off */
+    CHECK(p.mode == PR_PREVIEW && p.px && !strcmp(p.caller, "sketch") && !strcmp(p.cur.name, "sk0003.png"));
+    tap(&p, APP_TOUCH_RIGHT);
+    CHECK(p.mode == PR_PREVIEW && !strcmp(p.cur.name, "sk0003.png"));
+    tap(&p, APP_TOUCH_MIDDLE); /* print */
+    CHECK(p.print_req);
+    pr_run_print(&p);
+    CHECK(r.pr.posts >= 1 && p.mode == PR_RESULT && !p.back_req);
+    tap(&p, APP_TOUCH_MIDDLE); /* OK: back to the caller */
+    CHECK(p.back_req == 1);
+    pr_free(&p);
+
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "sketch:sk0003.png");
+    tap(&p, APP_TOUCH_LEFT); /* Back */
+    CHECK(p.back_req == 1 && !p.data);
+    pr_free(&p);
+
+    const char *bad[] = { "sketch:sk0500.png", "sketch:../x.png", "sketch:/etc/a.png", "sketch:a.exe", "sketch:", "sketch:sk0099.png", "sketch:writer/broken.txt" };
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+        pr_init(&p, &r.env);
+        pr_start_arg(&p, bad[i]); /* a plain message, no crash, nothing printed, back to the caller */
+        CHECK(p.mode == PR_RESULT && p.note[0] && !p.data);
+        tap(&p, APP_TOUCH_MIDDLE);
+        CHECK(p.back_req == 1);
+        pr_free(&p);
+    }
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "no colon here"); /* not our format: the plain list, no caller */
+    CHECK(p.mode == PR_LIST && !p.caller[0] && p.note[0]);
+    pr_start_arg(&p, "");
+    pr_free(&p);
+    rig_free(&r);
+}
+
 int main(void)
 {
+    start_argument();
     navigation();
     settings_row();
     preview_and_print();

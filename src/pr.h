@@ -39,11 +39,18 @@ typedef struct {
     int settings_req; /* 1: the glue starts the phone settings page; -1: stops it */
     int print_req;    /* the glue shows "Printing", then calls pr_run_print */
     char share[4][72]; /* the phone page's lines while PR_SETTINGS */
+    fl_entry_t cur;    /* the file previewed and printed: from the list, or from the start argument */
+    char caller[FL_APP]; /* the app that started us with a file (API 2.9): after printing or Back it gets the screen back */
+    int back_req;      /* 1: the glue calls app_launch(caller, "") and returns from app_main */
 } pr_t;
 
 void pr_init(pr_t *p, const pr_env_t *env);
 void pr_free(pr_t *p);
 void pr_rescan(pr_t *p);
+/* The start argument "app:path" (api->app_arg): the file `path` of the app `app` opens straight in the preview. A bad
+   argument or an unreadable file shows a message (PR_RESULT) and OK goes back to the caller, or to the list when the
+   app name itself is bad. An empty argument does nothing. */
+void pr_start_arg(pr_t *p, const char *arg);
 void pr_printer(const pr_t *p, char *out, size_t cap); /* the address in use */
 void pr_touch(pr_t *p, int zone, int gesture);
 /* After print_req: blocks while the job goes out; sets the result screen */

@@ -68,6 +68,10 @@ int app_main(const app_api_t *a)
     pr_init(&pr, &env);
     int sharing = 0, share_rc = 0;
     uint32_t sec = 0;
+    if (api->size >= APP_API_SLOT(55)) {
+        char arg[129];
+        if (api->app_arg(arg, sizeof(arg)) > 0) pr_start_arg(&pr, arg);
+    }
     pr_draw(&pr, &g, &bar);
     push(1);
     for (;;) {
@@ -96,6 +100,10 @@ int app_main(const app_api_t *a)
             }
         }
         if (exit_now) break;
+        if (pr.back_req) { /* the app that sent us a file gets the screen back */
+            if (api->size >= APP_API_SLOT(55)) api->app_launch(pr.caller, "");
+            break;
+        }
         if (pr.settings_req > 0) {
             share_rc = has_settings ? api->webshare_start_settings(APP_WEBSHARE_AUTO) : APP_ENOTSUP;
             sharing = share_rc == 0;

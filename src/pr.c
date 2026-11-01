@@ -54,16 +54,24 @@ void pr_printer(const pr_t *p, char *out, size_t cap)
     out[n] = 0;
 }
 
-static void open_preview(pr_t *p)
+/* Back to where the person came from: the caller when there is one (the glue launches it), else the list */
+static void go_back(pr_t *p)
 {
     drop_data(p);
-    const fl_entry_t *e = &p->list.e[p->sel - 1];
+    if (p->caller[0]) p->back_req = 1;
+    else p->mode = PR_LIST;
+}
+
+static void open_entry(pr_t *p, const fl_entry_t *e)
+{
+    drop_data(p);
+    p->cur = *e;
     uint8_t *buf = 0;
     size_t n = 0;
     if (p->env->read(p->env->u, e, &buf, &n) < 0 || !buf) {
         free(buf);
         set_note(p, "That file could not be read");
-        p->mode = PR_LIST;
+        p->mode = p->caller[0] ? PR_RESULT : PR_LIST;
         return;
     }
     p->data = buf;
@@ -74,14 +82,14 @@ static void open_preview(pr_t *p)
         if (png_dims(buf, n, &w, &h) < 0 || (size_t)((w + 7) / 8) * (size_t)h > IMG_MAX_BYTES) {
             drop_data(p);
             set_note(p, "That picture cannot be printed (not a PNG, or too big)");
-            p->mode = PR_LIST;
+            p->mode = p->caller[0] ? PR_RESULT : PR_LIST;
             return;
         }
         p->px = malloc((size_t)((w + 7) / 8) * (size_t)h);
         if (!p->px || png_decode(buf, n, p->px, w, h, (w + 7) / 8) < 0) {
             drop_data(p);
             set_note(p, "Not a 1-bit PNG (only Sketch pictures are read)");
-            p->mode = PR_LIST;
+            p->mode = p->caller[0] ? PR_RESULT : PR_LIST;
             return;
         }
         p->pw = w;
@@ -89,6 +97,61 @@ static void open_preview(pr_t *p)
     }
     p->note[0] = 0;
     p->mode = PR_PREVIEW;
+}
+
+static void open_preview(pr_t *p) { open_entry(p, &p->list.e[p->sel - 1]); }
+
+static int name_ok(const char *a, size_t n)
+{
+    if (n == 0 || n >= FL_APP || n > 24) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = a[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_')) return 0;
+    }
+    return 1;
+}
+
+static int path_ok(const char *s)
+{
+    size_t n = strlen(s);
+    if (n == 0 || n >= FL_NAME || s[0] == '/' || strchr(s, '\\')) return 0;
+    for (const char *q = s; *q;) {
+        const char *e = strchr(q, '/');
+        size_t k = e ? (size_t)(e - q) : strlen(q);
+        if (k == 0 || (k == 1 && q[0] == '.') || (k == 2 && q[0] == '.' && q[1] == '.')) return 0;
+        q += k + (e ? 1 : 0);
+        if (e && !*q) return 0;
+    }
+    return 1;
+}
+
+void pr_start_arg(pr_t *p, const char *arg)
+{
+    if (!arg || !arg[0]) return;
+    const char *colon = strchr(arg, ':');
+    if (!colon || !name_ok(arg, (size_t)(colon - arg))) {
+        set_note(p, "Print was started with an argument it does not understand");
+        return;
+    }
+    memcpy(p->caller, arg, (size_t)(colon - arg));
+    p->caller[colon - arg] = 0;
+    const char *path = colon + 1;
+    size_t n = strlen(path);
+    int png = n > 4 && !strcmp(path + n - 4, ".png");
+    int txt = n > 3 && (!strcmp(path + n - 3, ".md") || !strcmp(path + n - 4 > path ? path + n - 4 : path, ".txt"));
+    if (!path_ok(path) || !(png || txt)) {
+        set_note(p, "That file cannot be printed");
+        p->mode = PR_RESULT;
+        return;
+    }
+    fl_entry_t e;
+    memset(&e, 0, sizeof(e));
+    memcpy(e.app, p->caller, strlen(p->caller) + 1);
+    memcpy(e.group, p->caller, strlen(p->caller) < FL_GROUP ? strlen(p->caller) + 1 : 0);
+    memcpy(e.name, path, n + 1);
+    e.kind = png ? FL_PNG : FL_TEXT;
+    open_entry(p, &e);
+    if (p->mode == PR_LIST) p->mode = PR_RESULT; /* open_entry fell back to the list: tell why, then go back */
 }
 
 void pr_touch(pr_t *p, int zone, int gesture)
@@ -108,12 +171,16 @@ void pr_touch(pr_t *p, int zone, int gesture)
         break;
     case PR_PREVIEW:
         if (gesture != APP_GESTURE_TAP) break;
-        if (zone == APP_TOUCH_LEFT) drop_data(p), p->mode = PR_LIST;
-        else if (zone == APP_TOUCH_MIDDLE) p->mode = PR_PRINTING, p->print_req = 1;
-        else if (zone == APP_TOUCH_RIGHT && p->sel < p->list.n) p->sel++, open_preview(p);
+        if (zone == APP_TOUCH_LEFT) {
+            if (p->caller[0]) go_back(p);
+            else drop_data(p), p->mode = PR_LIST;
+        } else if (zone == APP_TOUCH_MIDDLE) p->mode = PR_PRINTING, p->print_req = 1;
+        else if (zone == APP_TOUCH_RIGHT && !p->caller[0] && p->sel < p->list.n) p->sel++, open_preview(p);
         break;
     case PR_RESULT:
-        if (gesture == APP_GESTURE_TAP) p->mode = p->data ? PR_PREVIEW : PR_LIST;
+        if (gesture != APP_GESTURE_TAP) break;
+        if (p->caller[0]) go_back(p); /* printed, or not: back in the app the person came from */
+        else p->mode = p->data ? PR_PREVIEW : PR_LIST;
         break;
     case PR_SETTINGS:
         if (gesture == APP_GESTURE_TAP) p->mode = PR_LIST, p->settings_req = -1;
@@ -127,7 +194,7 @@ void pr_run_print(pr_t *p)
     p->print_req = 0;
     char printer[80];
     pr_printer(p, printer, sizeof(printer));
-    const fl_entry_t *e = &p->list.e[p->sel - 1];
+    const fl_entry_t *e = &p->cur;
     pj_net_t net = p->env->net;
     char fmt[8];
     int fn = p->env->cfg_get(p->env->u, "format", fmt, (int)sizeof(fmt) - 1);
