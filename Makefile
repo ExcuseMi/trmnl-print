@@ -1,10 +1,11 @@
 # Host build: tests with sanitizers, the shots tool, the baked fonts, the PCL render (make render). The app ELF is built by the firmware fork's
 # apps/build.sh from apps/trmnl-print (run `make fonts` first).
 CC ?= gcc
-FW ?= $(HOME)/workspace/trmnl-fw-gb
+# API 2.8 (other apps' files) is in trmnl-fw-files until it is merged into trmnl-fw-gb
+FW ?= $(HOME)/workspace/trmnl-fw-files
 PY ?= $(HOME)/workspace/trmnl-fpv/.venv/bin/python
 CFLAGS = -Itest -std=c11 -O1 -g -Wall -Wextra -Werror -Wshadow -Isrc -Ihost -Igen -I$(FW)/include -fsanitize=address,undefined -fno-sanitize-recover=all
-CORE = src/pcl.c src/pwg.c src/ipp.c src/imgfit.c src/textlay.c src/flist.c src/printjob.c src/pr.c src/prui.c src/pngio.c src/font.c src/gfx.c gen/fonts_gen.c
+CORE = src/pcl.c src/pwg.c src/ipp.c src/imgfit.c src/textlay.c src/flist.c src/appfs.c src/printjob.c src/pr.c src/prui.c src/pngio.c src/font.c src/gfx.c gen/fonts_gen.c
 HOST = build/tbfw.o
 TESTS = $(patsubst test/%.c,build/%,$(wildcard test/test_*.c))
 

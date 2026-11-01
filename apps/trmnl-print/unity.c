@@ -12,6 +12,7 @@
 #include "../../src/imgfit.c"
 #include "../../src/textlay.c"
 #include "../../src/flist.c"
+#include "../../src/appfs.c"
 #include "../../src/printjob.c"
 #include "../../src/pr.c"
 #include "../../src/prui.c"

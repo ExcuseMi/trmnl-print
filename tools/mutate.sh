@@ -8,7 +8,7 @@ run() {
   if cmp -s $f /tmp/mut-backup.c; then echo "NOCHANGE $f $e"; return; fi
   if ! make build/$t >/dev/null 2>&1; then echo "BUILDFAIL(!) $t <- $f: $e"; cp /tmp/mut-backup.c $f; return; fi
   out=$(./build/$t 2>&1)
-  if echo "$out" | grep -q "FAILED\|ERROR: AddressSanitizer\|runtime error"; then echo "RED   $t  <- $f: $e"; else echo "GREEN(!) $t <- $f: $e"; fi
+  if echo "$out" | grep -q "FAILED\|ERROR: AddressSanitizer\|ERROR: LeakSanitizer\|runtime error"; then echo "RED   $t  <- $f: $e"; else echo "GREEN(!) $t <- $f: $e"; fi
   cp /tmp/mut-backup.c $f
 }
 run src/pcl.c 's/row\[i\] = (uint8_t)~row\[i\];/row[i] = row[i];/' test_pcl
@@ -38,3 +38,12 @@ run src/printjob.c 's/j->net->format == PJ_PCL ? IPP_PCL : IPP_PWG/j->net->forma
 run src/printjob.c 's/pwg_page(&o, reg, scale)/pwg_page(\&o, reg, 1 + 0 * scale)/' test_job
 run src/pr.c 's/net.format = fn == 3 \&\& !memcmp(fmt, "pcl", 3) ? PJ_PCL : PJ_PWG;/net.format = fn > 100 ? PJ_PCL : PJ_PWG;/' test_pr
 run src/imgfit.c 's/int m = IMG_MARGIN \* pw \/ 2480;/int m = IMG_MARGIN;/' test_fit
+run src/flist.c 's/return a->mtime < b->mtime ? 1 : -1;/return a->mtime < b->mtime ? -1 : 1;/' test_appfs
+run src/flist.c 's/if (!sub_folders || depth >= FL_DEPTH) return;/if (!sub_folders || depth >= FL_DEPTH + 1) return;/' test_appfs
+run src/flist.c 's/!strncmp(g.g\[i\], "trmnl-", 6)/!strncmp(g.g[i], "trmnl+", 6)/' test_appfs
+run src/appfs.c 's/api->size >= APP_API_SLOT(53) ? f_list_apps/api->size >= APP_API_SLOT(50) ? f_list_apps/' test_appfs
+run src/appfs.c 's/if (a->api->size < APP_API_SLOT(53)) return -1;//' test_appfs
+run src/appfs.c 's/if (rc < 0) return free(b), -1;/if (rc < 0) return -1;/' test_appfs
+run src/appfs.c 's/return c->cb(name, is_dir, size, mtime, c->u);/return c->cb(name, is_dir, size, 0 * mtime, c->u);/' test_appfs
+run src/flist.c 's/if (l->n >= FL_MAX || dl + nl >= FL_NAME) {/if (l->n >= FL_MAX) {/' test_flist
+# (the 1 MB read limit in appfs_read has two guards; either alone holds, so no single mutation turns it red)

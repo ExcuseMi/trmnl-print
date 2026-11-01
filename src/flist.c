@@ -40,38 +40,72 @@ static int kind_of(const char *n)
 
 typedef struct {
     fl_t *l;
-    const char *group;
+    const char *group, *app, *dir, *pre; /* dir: what is listed; pre: the folders in front of the name */
+    char sub[8][FL_NAME]; /* folders met, searched after this listing (no listing inside a callback) */
+    int nsub;
 } scan_t;
 
-static bool on_file(const char *name, bool is_dir, unsigned long size, void *ctx)
+static void add(fl_t *l, const char *group, const char *app, const char *dir, const char *name, unsigned long size, int64_t mtime, int k)
 {
-    scan_t *s = ctx;
-    if (is_dir) return true;
-    int k = kind_of(name);
-    if (k < 0) return true;
-    if (s->l->n >= FL_MAX || strlen(name) >= FL_NAME) {
-        s->l->dropped++;
-        return true;
+    size_t dl = dir[0] ? strlen(dir) + 1 : 0, nl = strlen(name);
+    if (l->n >= FL_MAX || dl + nl >= FL_NAME) {
+        l->dropped++;
+        return;
     }
-    fl_entry_t *e = &s->l->e[s->l->n++];
-    memcpy(e->group, s->group, strlen(s->group) + 1);
-    memcpy(e->name, name, strlen(name) + 1);
+    fl_entry_t *e = &l->e[l->n++];
+    memset(e, 0, sizeof(*e));
+    memcpy(e->group, group, strlen(group) + 1);
+    memcpy(e->app, app, strlen(app) + 1);
+    if (dl) memcpy(e->name, dir, dl - 1), e->name[dl - 1] = '/';
+    memcpy(e->name + dl, name, nl + 1);
     e->kind = (unsigned char)k;
     e->size = size;
+    e->mtime = mtime;
+}
+
+static bool on_file(const char *name, bool is_dir, unsigned long size, int64_t mtime, void *ctx)
+{
+    scan_t *s = ctx;
+    if (is_dir) {
+        size_t dl = s->pre[0] ? strlen(s->pre) + 1 : 0;
+        if (s->nsub < 8 && dl + strlen(name) < FL_NAME) {
+            char *d = s->sub[s->nsub++];
+            if (dl) memcpy(d, s->pre, dl - 1), d[dl - 1] = '/';
+            memcpy(d + dl, name, strlen(name) + 1);
+        } else {
+            s->l->dropped++;
+        }
+        return true;
+    }
+    int k = kind_of(name);
+    if (k >= 0) add(s->l, s->group, s->app, s->pre, name, size, mtime, k);
     return true;
 }
 
+/* The files of app `app` (or the own folder's group) under dir, and the folders below it down to `depth` */
+static void scan_dir(fl_t *l, const fl_fs_t *fs, const char *group, const char *app, const char *dir, int depth, int sub_folders)
+{
+    scan_t s;
+    memset(&s, 0, sizeof(s));
+    s.l = l, s.group = group, s.app = app, s.dir = dir, s.pre = sub_folders ? dir : "";
+    if (fs->list(fs->u, app, dir, on_file, &s) < 0) {
+        l->dropped++; /* one unreadable folder does not hide the others */
+        return;
+    }
+    if (!sub_folders || depth >= FL_DEPTH) return;
+    for (int i = 0; i < s.nsub; i++) scan_dir(l, fs, group, app, s.sub[i], depth + 1, 1);
+}
+
 typedef struct {
-    char g[16][FL_GROUP];
+    char g[24][FL_APP];
     int n, dropped;
 } groups_t;
 
-static bool on_root(const char *name, bool is_dir, unsigned long size, void *ctx)
+static bool on_root(const char *name, bool is_dir, unsigned long size, int64_t mtime, void *ctx)
 {
-    (void)size;
+    (void)is_dir, (void)size, (void)mtime;
     groups_t *g = ctx;
-    if (!is_dir) return true;
-    if (g->n >= 16 || strlen(name) >= FL_GROUP) {
+    if (g->n >= 24 || strlen(name) >= FL_APP) {
         g->dropped++;
         return true;
     }
@@ -79,17 +113,29 @@ static bool on_root(const char *name, bool is_dir, unsigned long size, void *ctx
     return true;
 }
 
+static bool on_own_root(const char *name, bool is_dir, unsigned long size, int64_t mtime, void *ctx)
+{
+    return is_dir ? on_root(name, 1, size, mtime, ctx) : true;
+}
+
 int fl_scan(fl_t *l, const fl_fs_t *fs)
 {
     memset(l, 0, sizeof(*l));
     groups_t g;
     memset(&g, 0, sizeof(g));
-    int rc = fs->list(fs->u, "", on_root, &g);
+    int rc = fs->list_apps ? fs->list_apps(fs->u, on_root, &g) : fs->list(fs->u, "", "", on_own_root, &g);
     if (rc < 0) return rc;
     l->dropped += g.dropped;
     for (int i = 0; i < g.n; i++) {
-        scan_t s = { l, g.g[i] };
-        if (fs->list(fs->u, g.g[i], on_file, &s) < 0) l->dropped++; /* one unreadable folder does not hide the others */
+        if (fs->list_apps) {
+            const char *shown = !strncmp(g.g[i], "trmnl-", 6) && g.g[i][6] ? g.g[i] + 6 : g.g[i];
+            char grp[FL_GROUP];
+            size_t n = strlen(shown) >= FL_GROUP ? FL_GROUP - 1 : strlen(shown);
+            memcpy(grp, shown, n), grp[n] = 0;
+            scan_dir(l, fs, grp, g.g[i], "", 0, 1);
+        } else {
+            scan_dir(l, fs, g.g[i], "", g.g[i], 0, 0);
+        }
     }
     fl_sort(l);
     return 0;
@@ -99,7 +145,9 @@ static int cmp(const void *pa, const void *pb)
 {
     const fl_entry_t *a = pa, *b = pb;
     int c = fl_natcmp(a->group, b->group);
-    return c ? c : fl_natcmp(b->name, a->name);
+    if (c) return c;
+    if (a->mtime != b->mtime) return a->mtime < b->mtime ? 1 : -1; /* newest first; unknown (0) last */
+    return fl_natcmp(b->name, a->name);
 }
 
 /* Insertion sort: the loader has no qsort, and the list is short */

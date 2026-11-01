@@ -45,7 +45,7 @@ static inline void printer_free(printer_t *p)
 /* ---- a file system: "group/name" files ---- */
 #define FS_N 256
 typedef struct {
-    char path[64];
+    char path[160];
     uint8_t *data;
     size_t n;
     int unreadable;
@@ -68,8 +68,9 @@ static inline void ffs_free(ffs_t *s)
 {
     for (int i = 0; i < s->count; i++) free(s->f[i].data);
 }
-static inline int ffs_list(void *u, const char *dir, fl_cb_t cb, void *ctx)
+static inline int ffs_list(void *u, const char *app, const char *dir, fl_cb_t cb, void *ctx)
 {
+    (void)app;
     ffs_t *s = u;
     if (s->fail_list_root && !dir[0]) return -1;
     size_t dl = strlen(dir);
@@ -86,18 +87,18 @@ static inline int ffs_list(void *u, const char *dir, fl_cb_t cb, void *ctx)
             for (int k = 0; k < ns; k++) dup |= !strcmp(seen[k], g);
             if (dup) continue;
             strcpy(seen[ns++], g);
-            if (!cb(g, true, 0, ctx)) break;
+            if (!cb(g, true, 0, 0, ctx)) break;
         } else if (!strncmp(p, dir, dl) && p[dl] == '/') {
-            if (!cb(p + dl + 1, false, s->f[i].n, ctx)) break;
+            if (!cb(p + dl + 1, false, s->f[i].n, 0, ctx)) break;
         }
     }
     return 0;
 }
-static inline int ffs_read(void *u, const char *group, const char *name, uint8_t **buf, size_t *n)
+static inline int ffs_read(void *u, const fl_entry_t *e, uint8_t **buf, size_t *n)
 {
     ffs_t *s = u;
-    char path[64];
-    strcpy(path, group), strcat(path, "/"), strcat(path, name);
+    char path[128];
+    strcpy(path, e->group), strcat(path, "/"), strcat(path, e->name);
     for (int i = 0; i < s->count; i++)
         if (!strcmp(s->f[i].path, path)) {
             if (s->f[i].unreadable) return -1;

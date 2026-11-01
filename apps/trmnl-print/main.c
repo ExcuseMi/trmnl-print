@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "app_orient.h"
+#include "appfs.h"
 #include "pr.h"
 
 APP_INFO("Print", 48 * 1024);
@@ -12,57 +13,7 @@ static const app_api_t *api;
 static pr_t pr;
 static pr_env_t env;
 
-/* ---- files: the app's own folder, one sub folder per source app (the API cannot read other apps' folders) ---- */
-
-typedef struct {
-    fl_cb_t cb;
-    void *u;
-} list_ctx_t;
-static bool on_entry(const char *name, bool is_dir, uint32_t size, void *ctx)
-{
-    list_ctx_t *l = ctx;
-    return l->cb(name, is_dir, size, l->u);
-}
-static int f_list(void *u, const char *dir, fl_cb_t cb, void *ctx)
-{
-    (void)u;
-    list_ctx_t l = { cb, ctx };
-    return api->file_list(dir, on_entry, &l);
-}
-
-static int f_read(void *u, const char *group, const char *name, uint8_t **buf, size_t *n)
-{
-    (void)u;
-    char path[FL_GROUP + FL_NAME + 2];
-    size_t g = strlen(group), m = strlen(name);
-    if (g + m + 2 > sizeof(path)) return -1;
-    memcpy(path, group, g);
-    path[g] = '/';
-    memcpy(path + g + 1, name, m + 1);
-    app_file_t *f = api->file_open(path, APP_FILE_READ);
-    if (!f) return -1;
-    size_t cap = 16 * 1024, len = 0;
-    uint8_t *b = malloc(cap);
-    int rc = b ? 0 : -1;
-    while (rc == 0 && len < PR_READ_MAX) {
-        if (len == cap) {
-            uint8_t *nb = realloc(b, cap *= 2);
-            if (!nb) { rc = -1; break; }
-            b = nb;
-        }
-        size_t want = cap - len;
-        if (len + want > PR_READ_MAX) want = PR_READ_MAX - len;
-        int k = api->file_read(f, b + len, want);
-        if (k < 0) rc = -1;
-        else if (k == 0) break;
-        else len += (size_t)k;
-    }
-    api->file_close(f);
-    if (rc < 0) return free(b), -1;
-    *buf = b;
-    *n = len;
-    return 0;
-}
+static appfs_t afs;
 
 static int cfg_get(void *u, const char *k, char *b, int cap) { return (void)u, api->setting_get(k, b, (size_t)cap); }
 
@@ -108,8 +59,10 @@ int app_main(const app_api_t *a)
     gfx_init(&g, fb, fw, fh, stride, orient);
     int has_settings = api->size >= APP_API_SLOT(47);
     if (has_settings) api->settings_declare(decl, 2);
-    env.files = (fl_fs_t){ 0, f_list };
-    env.read = f_read;
+    appfs_init(&afs, api);
+    env.files = afs.fs;
+    env.read = appfs_read;
+    env.u = &afs;
     env.cfg_get = cfg_get;
     env.net = (pj_net_t){ PJ_PWG, f_post, 0 };
     pr_init(&pr, &env);

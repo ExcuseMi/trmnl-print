@@ -99,7 +99,7 @@ typedef struct {
     pr_env_t env;
     cap_t cap;
 } rig_t;
-static int rread(void *u, const char *g, const char *n, uint8_t **b, size_t *s) { return ffs_read(&((rig_t *)u)->fs, g, n, b, s); }
+static int rread(void *u, const fl_entry_t *e, uint8_t **b, size_t *s) { return ffs_read(&((rig_t *)u)->fs, e, b, s); }
 static int rcfg(void *u, const char *k, char *b, int cap)
 {
     (void)u;
@@ -131,7 +131,7 @@ static int run(void)
     }
     ffs_put(&r.fs, "writer/notes.md", TEXT, strlen(TEXT));
     ffs_put(&r.fs, "writer/shopping.txt", "milk\nbread\n", 11);
-    r.env = (pr_env_t){ { &r.fs, ffs_list }, rread, rcfg, { PJ_PWG, cap_post, &r.cap }, &r };
+    r.env = (pr_env_t){ { &r.fs, ffs_list, 0 }, rread, rcfg, { PJ_PWG, cap_post, &r.cap }, &r };
     pr_t p;
     pr_init(&p, &r.env);
     p.sel = 2;

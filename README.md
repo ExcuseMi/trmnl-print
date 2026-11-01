@@ -16,12 +16,8 @@ Print for the TRMNL X: lists files, shows a sheet preview, sends the page to a n
 
 Settings (phone page): `printer` = `host` or `host:port`, default 192.0.2.40, port 631; `format` = `pwg` (default) or `pcl`.
 
-## Blockers of the app API (firmware fork 2.7), nothing changed there
-| Need | Today | Smallest addition |
-|---|---|---|
-| read other apps' files | `file_*` is limited to `/appdata/<app>/`, no `..` | `file_list_app(app, dir, cb, ctx)` and `file_open_app(app, path)`, read only (API 2.8). Until then the app lists its own folder, one sub folder per source app |
-| raw TCP (port 9100, streaming) | none; the loader's table does export `lwip_socket/connect/send/recv`, not in the API | `tcp_connect(host, port, timeout_ms)`, `tcp_send`, `tcp_close`. Only `printjob.c` changes |
-| file dates | `file_list` gives name and size | newest first is by name (natural order) |
+## Files (API 2.8, `src/appfs.c`)
+With `api->size >= APP_API_SLOT(53)` the list shows every app's files (`file_list_apps`, `file_list_app`, `file_open_app`): `.png .md .txt` up to 2 folders below each app's root, grouped by app, newest first by modification time (name order when the time is 0). Older firmware: only the print app's own folder, one sub folder per group, by name. Built against `trmnl-fw-files` until 2.8 is merged (`FW` in the Makefile). Raw TCP is still not in the API (IPP over `http_request` is used).
 
 Limits: only 1-bit PNGs of Sketch's writer are read (`pngio.c`); a full text page is about 520 KB as PWG (150 KB as PCL), a job holds 1 MB, more pages go as further jobs; a page that alone exceeds the buffer is refused with a message. Unproven on the real printer.
 

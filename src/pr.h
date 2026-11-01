@@ -17,7 +17,7 @@ enum { PR_LIST, PR_PREVIEW, PR_PRINTING, PR_RESULT, PR_SETTINGS };
 typedef struct {
     fl_fs_t files;
     /* the whole file into a malloc'd buffer (the caller frees); < 0 on failure */
-    int (*read)(void *u, const char *group, const char *name, uint8_t **buf, size_t *n);
+    int (*read)(void *u, const fl_entry_t *e, uint8_t **buf, size_t *n);
     int (*cfg_get)(void *u, const char *key, char *buf, int cap); /* length, or < 0 */
     pj_net_t net;
     void *u;

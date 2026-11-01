@@ -25,7 +25,7 @@ static int rig_cfg(void *u, const char *k, char *b, int cap)
     memcpy(b, v, (size_t)n);
     return n;
 }
-static int rig_read(void *u, const char *g, const char *n, uint8_t **b, size_t *sz) { return ffs_read(&((rig_t *)u)->fs, g, n, b, sz); }
+static int rig_read(void *u, const fl_entry_t *e, uint8_t **b, size_t *sz) { return ffs_read(&((rig_t *)u)->fs, e, b, sz); }
 
 static void paint(uint8_t *px, int stride, int w, int h)
 {
@@ -48,7 +48,7 @@ static void rig_new(rig_t *r)
     ffs_put(&r->fs, "writer/broken.txt", "x", 1);
     r->fs.f[r->fs.count - 1].unreadable = 1;
     ffs_put(&r->fs, "sketch/sk0099.png", "this is not a png at all, just text", 35);
-    r->env.files = (fl_fs_t){ &r->fs, ffs_list };
+    r->env.files = (fl_fs_t){ &r->fs, ffs_list, 0 };
     r->env.read = rig_read;
     r->env.cfg_get = rig_cfg;
     r->env.net = (pj_net_t){ PJ_PWG, fake_post, &r->pr };

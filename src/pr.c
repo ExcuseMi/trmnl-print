@@ -60,7 +60,7 @@ static void open_preview(pr_t *p)
     const fl_entry_t *e = &p->list.e[p->sel - 1];
     uint8_t *buf = 0;
     size_t n = 0;
-    if (p->env->read(p->env->u, e->group, e->name, &buf, &n) < 0 || !buf) {
+    if (p->env->read(p->env->u, e, &buf, &n) < 0 || !buf) {
         free(buf);
         set_note(p, "That file could not be read");
         p->mode = PR_LIST;

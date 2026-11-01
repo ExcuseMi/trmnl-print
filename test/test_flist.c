@@ -32,7 +32,7 @@ static void grouping(void)
     ffs_put(&fs, "gameboy/shot2.png", "x", 1);
     ffs_put(&fs, "loose.txt", "x", 1);                    /* not in a folder: not an app's file */
     fl_t l;
-    fl_fs_t f = { &fs, ffs_list };
+    fl_fs_t f = { &fs, ffs_list, 0 };
     CHECK(fl_scan(&l, &f) == 0);
     CHECK(l.n == 6 && l.dropped == 0);
     const char *want[] = { "gameboy/shot2.png", "sketch/sk0010.png", "sketch/sk0002.png", "sketch/sk0001.png", "writer/notes.txt", "writer/diary.md" };
@@ -51,9 +51,9 @@ static void limits(void)
     ffs_t fs;
     memset(&fs, 0, sizeof(fs));
     ffs_put(&fs, "sketch/a.png", "x", 1);
-    ffs_put(&fs, "sketch/this-name-is-far-too-long-to-be-kept-in-the-list.png", "x", 1);
+    ffs_put(&fs, "sketch/this-name-is-far-too-long-to-be-kept-in-the-list-of-the-print-app.png", "x", 1);
     fl_t l;
-    fl_fs_t f = { &fs, ffs_list };
+    fl_fs_t f = { &fs, ffs_list, 0 };
     CHECK(fl_scan(&l, &f) == 0 && l.n == 1 && l.dropped == 1);
     ffs_free(&fs);
     /* more files than the list holds: the first FL_MAX are kept, the rest counted */
@@ -65,7 +65,7 @@ static void limits(void)
         snprintf(p, sizeof(p), "g/f%03d.txt", i);
         ffs_put(&big, p, "x", 1);
     }
-    fl_fs_t bf = { &big, ffs_list };
+    fl_fs_t bf = { &big, ffs_list, 0 };
     CHECK(fl_scan(&bl, &bf) == 0 && bl.n == FL_MAX && bl.dropped == 8);
     CHECK(bl.e[0].name[0] == 'f');
     ffs_free(&big);
@@ -73,11 +73,11 @@ static void limits(void)
     ffs_t bad;
     memset(&bad, 0, sizeof(bad));
     bad.fail_list_root = 1;
-    CHECK(fl_scan(&l, &(fl_fs_t){ &bad, ffs_list }) < 0 && l.n == 0);
+    CHECK(fl_scan(&l, &(fl_fs_t){ &bad, ffs_list, 0 }) < 0 && l.n == 0);
     /* nothing there at all */
     ffs_t none;
     memset(&none, 0, sizeof(none));
-    CHECK(fl_scan(&l, &(fl_fs_t){ &none, ffs_list }) == 0 && l.n == 0);
+    CHECK(fl_scan(&l, &(fl_fs_t){ &none, ffs_list, 0 }) == 0 && l.n == 0);
 }
 
 int main(void)
