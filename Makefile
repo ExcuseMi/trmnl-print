@@ -32,13 +32,10 @@ clean:
 	rm -rf build shots gen
 .PHONY: all fonts test shots clean
 # The app ELF, with the firmware fork's import check (every libc call must be in the loader's table).
-# The Xtensa linker (ld 2.43.1, --gc-sections --strip-all) aborts with "double free or corruption" for some output
-# paths on this app (heap layout; no ELF is made then, so nothing broken can ship): each try uses another path length.
 elf: gen/fonts_gen.c
-	@mkdir -p build/elf; ok=0; for n in sk sk2 a bb cccc ddddddd eeeeeeee tttttttttt; do d=$${TMPDIR:-/tmp}/print-elf-$$n; rm -rf $$d; \
-	  if OUT=$$d $(FW)/apps/build.sh $(CURDIR)/apps/trmnl-print >/dev/null 2>$$d.err; then cp $$d/trmnl-print.elf build/elf/; rm -rf $$d; ok=1; break; fi; \
-	  rm -rf $$d; done; [ $$ok = 1 ] || { echo "no ELF; the build said:"; tail -3 $${TMPDIR:-/tmp}/print-elf-eeeeeeee.err; exit 1; }; \
-	  ls -l build/elf/trmnl-print.elf; sha256sum build/elf/trmnl-print.elf
+	@mkdir -p build/elf; d=$${TMPDIR:-/tmp}/print-elf-$$$$; rm -rf $$d; \
+	  OUT=$$d $(FW)/apps/build.sh $(CURDIR)/apps/trmnl-print >/dev/null || { rm -rf $$d; exit 1; }; \
+	  cp $$d/trmnl-print.elf build/elf/; rm -rf $$d; ls -l build/elf/trmnl-print.elf; sha256sum build/elf/trmnl-print.elf
 .PHONY: elf
 # Looks at what the app sends, rendered by software that is not ours (no printer involved): PWG raster through CUPS'
 # rastertopdf and ghostscript, PCL through Artifex's gpcl6. make render, then view shots/r/*.png
