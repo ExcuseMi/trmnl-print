@@ -2,7 +2,7 @@
 #include "pcl.h"
 #include <string.h>
 
-static void emit(pcl_out_t *o, const void *b, size_t n)
+static void pcl_emit(pcl_out_t *o, const void *b, size_t n)
 {
     if (o->err) return;
     int rc = o->write(o->u, b, n);
@@ -11,7 +11,7 @@ static void emit(pcl_out_t *o, const void *b, size_t n)
 }
 
 /* ESC, `pre`, the number, `post`: "\x1b*p" 12 "X" (the loader has no snprintf) */
-static void emitf(pcl_out_t *o, const char *pre, int a, char post)
+static void pcl_emitf(pcl_out_t *o, const char *pre, int a, char post)
 {
     char t[24];
     size_t n = 0;
@@ -21,7 +21,7 @@ static void emitf(pcl_out_t *o, const char *pre, int a, char post)
     do d[m++] = (char)('0' + a % 10), a /= 10; while (a);
     while (m) t[n++] = d[--m];
     t[n++] = post;
-    emit(o, t, n);
+    pcl_emit(o, t, n);
 }
 
 size_t packbits_encode(const uint8_t *s, size_t n, uint8_t *d)
@@ -69,13 +69,13 @@ long packbits_decode(const uint8_t *s, size_t n, uint8_t *d, size_t cap)
 
 void pcl_job_begin(pcl_out_t *o)
 {
-    emit(o, "\x1b" "E", 2);          /* reset */
-    emit(o, "\x1b&u300D", 7);        /* units: 300 per inch */
-    emit(o, "\x1b&l26A", 6);         /* A4 */
-    emit(o, "\x1b&l0O", 5);          /* portrait */
+    pcl_emit(o, "\x1b" "E", 2);          /* reset */
+    pcl_emit(o, "\x1b&u300D", 7);        /* units: 300 per inch */
+    pcl_emit(o, "\x1b&l26A", 6);         /* A4 */
+    pcl_emit(o, "\x1b&l0O", 5);          /* portrait */
 }
 
-void pcl_job_end(pcl_out_t *o) { emit(o, "\x1b" "E", 2); }
+void pcl_job_end(pcl_out_t *o) { pcl_emit(o, "\x1b" "E", 2); }
 
 int pcl_page(pcl_out_t *o, const pcl_region_t *r)
 {
@@ -84,20 +84,20 @@ int pcl_page(pcl_out_t *o, const pcl_region_t *r)
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     uint8_t row[PCL_PAGE_W / 8], enc[PCL_PAGE_W / 8 + PCL_PAGE_W / 8 / 128 + 2];
-    emitf(o, "\x1b*p", x, 'X');
-    emitf(o, "\x1b*p", y, 'Y');
-    emit(o, "\x1b*t300R", 7);        /* 300 dpi */
-    emit(o, "\x1b*r1A", 5);          /* start raster at the cursor */
-    emit(o, "\x1b*b2M", 5);          /* PackBits rows */
+    pcl_emitf(o, "\x1b*p", x, 'X');
+    pcl_emitf(o, "\x1b*p", y, 'Y');
+    pcl_emit(o, "\x1b*t300R", 7);        /* 300 dpi */
+    pcl_emit(o, "\x1b*r1A", 5);          /* start raster at the cursor */
+    pcl_emit(o, "\x1b*b2M", 5);          /* PackBits rows */
     for (int j = 0; j < r->h && !o->err; j++) {
         int rc = r->get_row(r->u, j, row);
         if (rc < 0) return rc;
         for (int i = 0; i < rb; i++) row[i] = (uint8_t)~row[i]; /* PCL: 1 = ink */
         size_t n = packbits_encode(row, (size_t)rb, enc);
-        emitf(o, "\x1b*b", (int)n, 'W');
-        emit(o, enc, n);
+        pcl_emitf(o, "\x1b*b", (int)n, 'W');
+        pcl_emit(o, enc, n);
     }
-    emit(o, "\x1b*rB", 4);           /* end raster */
-    emit(o, "\f", 1);
+    pcl_emit(o, "\x1b*rB", 4);           /* end raster */
+    pcl_emit(o, "\f", 1);
     return o->err;
 }
