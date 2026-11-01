@@ -6,8 +6,11 @@
 #include "app_orient.h"
 #include "appfs.h"
 #include "pr.h"
+#include "prcfg.h"
 
 APP_INFO("Print", 48 * 1024);
+#include "icon.h"
+APP_ICON(PRINT_ICON);
 
 static const app_api_t *api;
 static pr_t pr;
@@ -36,28 +39,9 @@ static int f_post(void *u, const char *url, const void *body, size_t n, uint8_t 
     return rs.status;
 }
 
-/* The default printer's file (src/printer.h): this app's own folder */
-static int cfg_read(void *u, char *buf, size_t cap)
-{
-    (void)u;
-    app_file_t *f = api->file_open(PJ_CFG_FILE, APP_FILE_READ);
-    if (!f) return -1;
-    size_t len = 0;
-    int k = 0;
-    while (len < cap && (k = api->file_read(f, buf + len, cap - len)) > 0) len += (size_t)k;
-    api->file_close(f);
-    return k < 0 ? -1 : (int)len;
-}
-
-static int cfg_write(void *u, const char *text, size_t n)
-{
-    (void)u;
-    app_file_t *f = api->file_open(PJ_CFG_FILE, APP_FILE_WRITE);
-    if (!f) return -1;
-    int k = api->file_write(f, text, n);
-    int c = api->file_close(f);
-    return k == (int)n && c >= 0 ? 0 : -1;
-}
+/* The default printer text (src/prcfg.c): the X's device settings on API 2.11, else this app's printer.cfg */
+static int cfg_read(void *u, char *buf, size_t cap) { return (void)u, prcfg_read(api, buf, cap); }
+static int cfg_write(void *u, const char *text, size_t n) { return (void)u, prcfg_write(api, text, n); }
 
 static int f_browse(void *u, app_browse_cb_t cb, void *ctx)
 {
@@ -135,7 +119,7 @@ int app_main(const app_api_t *a)
             default: break;
             }
         }
-        if (exit_now) break;
+        if (exit_now || pr.exit_req) break;
         if (pr.back_req) { /* the app that sent us a file gets the screen back */
             if (api->size >= APP_API_SLOT(55)) api->app_launch(pr.caller, "");
             break;

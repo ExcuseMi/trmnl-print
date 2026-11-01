@@ -284,9 +284,43 @@ static void setup_argument(void)
     rig_free(&r);
 }
 
+static void test_argument(void)
+{
+    static rig_t r;
+    rig_new(&r);
+    pr_t p;
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "test");                              /* with a default: asks first, prints nothing yet */
+    CHECK(p.mode == PR_TESTASK && p.test_exit && !p.exit_req && r.pr.posts == 0);
+    tap(&p, APP_TOUCH_MIDDLE);                             /* confirmed */
+    CHECK(p.mode == PR_PRINTING && p.print_req);
+    pr_run_print(&p);
+    CHECK(p.mode == PR_RESULT && r.pr.posts >= 1 && !p.exit_req);
+    tap(&p, APP_TOUCH_MIDDLE);                             /* OK: leaves, no printer menu */
+    CHECK(p.exit_req == 1);
+    pr_free(&p);
+
+    pr_init(&p, &r.env);
+    int posts = r.pr.posts;
+    pr_start_arg(&p, "test");
+    tap(&p, APP_TOUCH_LEFT);                               /* Cancel: leaves, nothing printed */
+    CHECK(p.exit_req == 1 && r.pr.posts == posts);
+    pr_free(&p);
+
+    no_default(&r);
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "test");                              /* no printer: a message, OK leaves */
+    CHECK(p.mode == PR_RESULT && strstr(p.note, "No printer") && r.pr.posts == posts);
+    tap(&p, APP_TOUCH_MIDDLE);
+    CHECK(p.exit_req == 1 && !p.print_req);
+    pr_free(&p);
+    rig_free(&r);
+}
+
 int main(void)
 {
     none_found();
+    test_argument();
     one_found_is_saved_and_used();
     several_found();
     search_errors();

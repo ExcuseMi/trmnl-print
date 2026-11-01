@@ -129,6 +129,12 @@ static int path_ok(const char *s)
 void pr_start_arg(pr_t *p, const char *arg)
 {
     if (!arg || !arg[0]) return;
+    if (!strcmp(arg, "test")) {
+        p->test_exit = p->test = 1;
+        if (p->have_def) p->mode = PR_TESTASK;
+        else set_note(p, "No printer yet: set one up in Print"), p->mode = PR_RESULT;
+        return;
+    }
     if (strlen(arg) >= 6 && !memcmp(arg, "setup:", 6)) { /* an app sends the person to set a printer up, and gets the screen back */
         size_t k = strlen(arg + 6);
         if (!name_ok(arg + 6, k)) {
@@ -194,7 +200,8 @@ void pr_touch(pr_t *p, int zone, int gesture)
         break;
     case PR_RESULT:
         if (gesture != APP_GESTURE_TAP) break;
-        if (p->test) p->test = 0, p->mode = PR_PICK;
+        if (p->test_exit) p->exit_req = 1;
+        else if (p->test) p->test = 0, p->mode = PR_PICK;
         else if (p->caller[0]) go_back(p); /* printed, or not: back in the app the person came from */
         else p->mode = p->data ? PR_PREVIEW : PR_LIST;
         break;

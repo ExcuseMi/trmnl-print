@@ -131,16 +131,30 @@ int pj_cfg_parse(const char *text, size_t n, pj_printer_t *p)
     return have_host ? 0 : (pc_init(p), PJ_NO_PRINTER);
 }
 
+int pj_device_text(const app_api_t *api, char *buf, size_t cap)
+{
+    if (!api || !buf || cap < PJ_CFG_MAX + 1 || api->size < APP_API_SLOT(58) || !api->device_setting_get) return APP_ENOTSUP;
+    int n = api->device_setting_get(PJ_DEV_KEY, buf, cap);
+    if (n == APP_ENOENT) return PJ_NO_PRINTER;
+    if (n < 0 || (size_t)n >= cap) return APP_EIO;
+    return n;
+}
+
 int pj_default_printer(const app_api_t *api, pj_printer_t *out)
 {
     if (!api || !out) return APP_EINVAL;
+    char buf[PJ_CFG_MAX + 1];
+    if (api->size >= APP_API_SLOT(58)) { /* API 2.11: the firmware owns the default printer */
+        int n = pj_device_text(api, buf, sizeof(buf));
+        if (n < 0) return n;
+        return pj_cfg_parse(buf, (size_t)n, out);
+    }
     if (api->size < APP_API_SLOT(53)) return APP_ENOTSUP;
     app_file_t *f = api->file_open_app(PJ_CFG_APP, PJ_CFG_FILE);
     if (!f) return PJ_NO_PRINTER;
-    char buf[PJ_CFG_MAX];
     size_t len = 0;
     int k = 0;
-    while (len < sizeof(buf) && (k = api->file_read(f, buf + len, sizeof(buf) - len)) > 0) len += (size_t)k;
+    while (len < PJ_CFG_MAX && (k = api->file_read(f, buf + len, PJ_CFG_MAX - len)) > 0) len += (size_t)k;
     api->file_close(f);
     if (k < 0) return APP_EIO;
     return pj_cfg_parse(buf, len, out);

@@ -59,6 +59,8 @@ typedef struct {
     int find_req;      /* the glue shows "Finding printers", then calls pr_run_find */
     int pick_back;     /* the mode PR_PICK goes back to */
     int setup;         /* started with "setup:<app>": choosing a printer (or Back) returns to that app */
+    int exit_req;      /* 1: the glue leaves app_main (the "test" start argument is done) */
+    int test_exit;     /* started with "test": the test page, then exit; no printer menu */
     int test;          /* the print run or result in progress is the test page */
     char snap[2][80];  /* the phone page's printer and format values when it opened: only a change counts */
 } pr_t;
@@ -70,6 +72,8 @@ void pr_rescan(pr_t *p);
    argument or an unreadable file shows a message (PR_RESULT) and OK goes back to the caller, or to the list when the
    app name itself is bad. An empty argument does nothing. */
 void pr_start_arg(pr_t *p, const char *arg);
+/* The start argument "test" (the X's phone page): confirm on the X, print the test page on the default printer, then
+   exit_req. Without a default printer: the message, OK exits. */
 /* The default printer as shown ("name  address" or the address), "" when there is none */
 void pr_printer(const pr_t *p, char *out, size_t cap);
 /* After find_req: blocks while the network is searched; PR_PICK with the printers found */

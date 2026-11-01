@@ -17,6 +17,7 @@
 #define PJ_CFG_MAX 512
 #define PJ_DEFAULT_PORT 631
 #define PJ_DEFAULT_PATH "ipp/print"
+#define PJ_DEV_KEY "printer" /* API 2.11: device_setting_get/set key; the value is the same text, up to PJ_CFG_MAX + 1 bytes */
 #define PJ_NO_PRINTER (-20) /* pj_default_printer: no printer set up (no file, or one that holds no usable host) */
 
 typedef struct {
@@ -35,7 +36,10 @@ void pj_printer_addr(const pj_printer_t *p, char *out, size_t cap);
 int pj_cfg_format(const pj_printer_t *p, char *out, size_t cap);
 /* 0, or PJ_NO_PRINTER when the text holds no usable host */
 int pj_cfg_parse(const char *text, size_t n, pj_printer_t *p);
-/* For any app: reads the default printer from the Print app's file. 0 and *out, PJ_NO_PRINTER (tell the person "No
+/* API 2.11 (api->size >= APP_API_SLOT(58)): the "printer" device setting into buf (cap >= PJ_CFG_MAX + 1). Its length,
+   PJ_NO_PRINTER (none set), APP_EIO, or APP_ENOTSUP (older firmware or bad arguments) */
+int pj_device_text(const app_api_t *api, char *buf, size_t cap);
+/* For any app: reads the default printer, from the X's device settings on API 2.11+, else from the Print app's file. 0 and *out, PJ_NO_PRINTER (tell the person "No
    printer yet: set one up in Print" and offer app_launch("trmnl-print", "setup:<this app>")), APP_ENOTSUP (the
    firmware is older than API 2.8) or APP_EIO */
 int pj_default_printer(const app_api_t *api, pj_printer_t *out);

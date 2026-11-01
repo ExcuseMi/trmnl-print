@@ -85,7 +85,7 @@ static void default_printer(void)
 {
     app_api_t api;
     memset(&api, 0, sizeof(api));
-    api.size = sizeof(api);
+    api.size = APP_API_SLOT(58) - 1;                                            /* firmware before API 2.11: the file */
     api.file_open_app = f_open_app;
     api.file_read = f_read;
     api.file_close = f_close;
@@ -108,6 +108,55 @@ static void default_printer(void)
     int before = opened;
     CHECK(pj_default_printer(&api, &p) == APP_ENOTSUP && opened == before);
     CHECK(pj_default_printer(NULL, &p) == APP_EINVAL);
+}
+
+/* ---- API 2.11: the firmware owns the default printer ---- */
+static char dev_text[PJ_CFG_MAX + 100];
+static int dev_rc, dev_calls;
+static size_t dev_cap_seen;
+static char dev_key[16];
+static int d_get(const char *key, char *buf, size_t cap)
+{
+    dev_calls++, dev_cap_seen = cap;
+    snprintf(dev_key, sizeof(dev_key), "%s", key);
+    if (dev_rc) return dev_rc;
+    size_t n = strlen(dev_text);
+    if (n >= cap) return APP_EINVAL;
+    memcpy(buf, dev_text, n + 1);
+    return (int)n;
+}
+
+static void default_printer_211(void)
+{
+    app_api_t api;
+    memset(&api, 0, sizeof(api));
+    api.size = sizeof(api);
+    api.file_open_app = f_open_app;
+    api.file_read = f_read;
+    api.file_close = f_close;
+    api.device_setting_get = d_get;
+    pj_printer_t p;
+    file_exists = 1, put("host=1.1.1.1\n");                                   /* an old file must not be read on 2.11 */
+    int before = opened;
+    snprintf(dev_text, sizeof(dev_text), "name=Hall\nhost=10.0.0.5\nport=9100\nformat=pcl\n");
+    CHECK(pj_default_printer(&api, &p) == 0 && !strcmp(p.host, "10.0.0.5") && p.port == 9100 && p.format == PJ_PCL);
+    CHECK(!strcmp(dev_key, "printer") && dev_cap_seen >= 513 && opened == before);
+    dev_rc = APP_ENOENT;
+    CHECK(pj_default_printer(&api, &p) == PJ_NO_PRINTER);
+    dev_rc = APP_EIO;
+    CHECK(pj_default_printer(&api, &p) == APP_EIO);
+    dev_rc = 0;
+    snprintf(dev_text, sizeof(dev_text), "name=only a name\n");
+    CHECK(pj_default_printer(&api, &p) == PJ_NO_PRINTER);                       /* text without a host */
+    memset(dev_text, 'x', sizeof(dev_text) - 1), dev_text[sizeof(dev_text) - 1] = 0;
+    CHECK(pj_default_printer(&api, &p) == APP_EIO);                             /* more than the documented 513 bytes */
+    api.device_setting_get = 0;
+    CHECK(pj_default_printer(&api, &p) == APP_ENOTSUP);                         /* slot present but empty: no crash */
+    api.device_setting_get = d_get;
+    api.size = APP_API_SLOT(58) - 1;                                            /* 2.10: back to the file */
+    int calls = dev_calls;
+    put("host=10.0.0.9\n");
+    CHECK(pj_default_printer(&api, &p) == 0 && !strcmp(p.host, "10.0.0.9") && dev_calls == calls);
 }
 
 static void strbuf(void)
@@ -135,5 +184,6 @@ int main(void)
     cfg_round_trip();
     cfg_bad_files();
     default_printer();
+    default_printer_211();
     return CHECK_DONE("test_printer");
 }

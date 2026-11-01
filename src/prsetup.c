@@ -103,7 +103,7 @@ void prs_touch(pr_t *p, int zone, int gesture)
 {
     if (gesture != APP_GESTURE_TAP) return;
     if (p->mode == PR_TESTASK) {
-        if (zone == APP_TOUCH_LEFT) p->mode = PR_PICK;
+        if (zone == APP_TOUCH_LEFT) p->test_exit ? (void)(p->exit_req = 1) : (void)(p->mode = PR_PICK);
         else if (zone == APP_TOUCH_MIDDLE) p->test = 1, p->mode = PR_PRINTING, p->print_req = 1;
         return;
     }

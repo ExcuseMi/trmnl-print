@@ -5,7 +5,7 @@ CC ?= gcc
 FW ?= $(HOME)/workspace/trmnl-fw-files
 PY ?= $(HOME)/workspace/trmnl-fpv/.venv/bin/python
 CFLAGS = -Itest -std=c11 -O1 -g -Wall -Wextra -Werror -Wshadow -Isrc -Ihost -Igen -I$(FW)/include -fsanitize=address,undefined -fno-sanitize-recover=all
-CORE = src/pcl.c src/pwg.c src/ipp.c src/imgfit.c src/textlay.c src/flist.c src/appfs.c src/printjob.c src/pr.c src/prsetup.c src/printer.c src/prui.c src/pngio.c src/font.c src/gfx.c gen/fonts_gen.c
+CORE = src/pcl.c src/pwg.c src/ipp.c src/imgfit.c src/textlay.c src/flist.c src/appfs.c src/printjob.c src/pr.c src/prcfg.c src/prsetup.c src/printer.c src/prui.c src/pngio.c src/font.c src/gfx.c gen/fonts_gen.c
 HOST = build/tbfw.o
 TESTS = $(patsubst test/%.c,build/%,$(wildcard test/test_*.c))
 
