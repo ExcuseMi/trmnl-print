@@ -1,11 +1,11 @@
 /* The Print app's printer setup: finding printers on the network, the default printer file, the phone fallback and the
    test page. SPDX-License-Identifier: MIT */
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "pr.h"
+#include "strbuf.h"
 
-static void note(pr_t *p, const char *s) { snprintf(p->note, sizeof(p->note), "%s", s); }
+static void note(pr_t *p, const char *s) { sb_set(p->note, sizeof(p->note), s); }
 
 void prs_load(pr_t *p)
 {
@@ -52,10 +52,10 @@ static void on_found(const char *name, const char *host, uint16_t port, const ch
     pj_printer_t *f = &p->found[p->nfound];
     memset(f, 0, sizeof(*f));
     if (strlen(host) >= sizeof(f->host)) return;
-    snprintf(f->name, sizeof(f->name), "%s", name ? name : "");
+    sb_set(f->name, sizeof(f->name), name ? name : "");
     memcpy(f->host, host, strlen(host) + 1);
     f->port = port;
-    snprintf(f->path, sizeof(f->path), "%s", path ? path : "");
+    sb_set(f->path, sizeof(f->path), path ? path : "");
     f->format = p->have_def ? p->def.format : PJ_PWG;
     p->nfound++;
 }
@@ -115,8 +115,7 @@ void prs_touch(pr_t *p, int zone, int gesture)
         case PK_FOUND: choose(p, p->psel); break;
         case PK_FIND: p->mode = PR_FINDING, p->find_req = 1; break;
         case PK_PHONE:
-            snprintf(p->snap[0], sizeof(p->snap[0]), "%s", "");
-            snprintf(p->snap[1], sizeof(p->snap[1]), "%s", "");
+            p->snap[0][0] = p->snap[1][0] = 0;
             p->env->cfg_get(p->env->u, "printer", p->snap[0], (int)sizeof(p->snap[0]) - 1);
             p->env->cfg_get(p->env->u, "format", p->snap[1], (int)sizeof(p->snap[1]) - 1);
             p->mode = PR_SETTINGS, p->settings_req = 1;
@@ -173,7 +172,7 @@ void prs_settings_closed(pr_t *p)
 static void date_str(int64_t t, char *out, size_t cap)
 {
     if (t <= 0) {
-        snprintf(out, cap, "date unknown");
+        sb_set(out, cap, "date unknown");
         return;
     }
     int64_t days = t / 86400, rem = t % 86400;
@@ -181,15 +180,17 @@ static void date_str(int64_t t, char *out, size_t cap)
     int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365, y = yoe + era * 400;
     int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
     int d = (int)(doy - (153 * mp + 2) / 5 + 1), m = (int)(mp < 10 ? mp + 3 : mp - 9);
-    snprintf(out, cap, "%04d-%02d-%02d %02d:%02d UTC", (int)(y + (m <= 2)), m, d, (int)(rem / 3600), (int)(rem % 3600 / 60));
+    out[0] = 0;
+    sb_int(out, cap, y + (m <= 2), 4), sb_cat(out, cap, "-"), sb_int(out, cap, m, 2), sb_cat(out, cap, "-"), sb_int(out, cap, d, 2);
+    sb_cat(out, cap, " "), sb_int(out, cap, rem / 3600, 2), sb_cat(out, cap, ":"), sb_int(out, cap, rem % 3600 / 60, 2), sb_cat(out, cap, " UTC");
 }
 
 int prs_print_test(pr_t *p)
 {
     memset(&p->res, 0, sizeof(p->res));
-    if (!p->have_def) return snprintf(p->res.msg, sizeof(p->res.msg), "No printer yet: set one up first"), -1;
+    if (!p->have_def) return sb_set(p->res.msg, sizeof(p->res.msg), "No printer yet: set one up first"), -1;
     uint8_t *px = malloc((size_t)(TP_W / 8) * TP_H);
-    if (!px) return snprintf(p->res.msg, sizeof(p->res.msg), "Not enough memory to print"), -1;
+    if (!px) return sb_set(p->res.msg, sizeof(p->res.msg), "Not enough memory to print"), -1;
     gfx_t g;
     gfx_init(&g, px, TP_W, TP_H, TP_W / 8, APP_ORIENT_BAR_BOTTOM);
     gfx_fill(&g, GFX_WHITE);

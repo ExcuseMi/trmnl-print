@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: MIT */
 #include "printjob.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "imgfit.h"
@@ -8,6 +7,7 @@
 #include "pcl.h"
 #include "pngio.h"
 #include "pwg.h"
+#include "strbuf.h"
 #include "textlay.h"
 
 #define PJ_FULL (-2)
@@ -67,13 +67,15 @@ static int job_open(job_t *j, const pj_net_t *net, const pj_printer_t *printer, 
     if (!printer->host[0] || pj_printer_parse(addr, &chk) < 0) return say(r, "Printer address is not valid: ", printer->host, -1), -1;
     memcpy(j->host, printer->host, sizeof(j->host));
     j->port = printer->port;
-    snprintf(j->path, sizeof(j->path), "%s", printer->path[0] ? printer->path : PJ_DEFAULT_PATH);
+    sb_set(j->path, sizeof(j->path), printer->path[0] ? printer->path : PJ_DEFAULT_PATH);
     size_t cap = pj_job_bytes;
     j->b.p = malloc(cap);
     if (!j->b.p && cap > PJ_JOB_BYTES_SMALL) j->b.p = malloc(cap = PJ_JOB_BYTES_SMALL);
     if (!j->b.p) return say(r, "Not enough memory to print", "", -1), -1;
     j->b.cap = cap;
-    if (snprintf(j->url, sizeof(j->url), "http://%s:%d/%s", j->host, j->port, j->path) >= (int)sizeof(j->url)) return free(j->b.p), say(r, "Printer address is too long", "", -1), -1;
+    int cut = sb_set(j->url, sizeof(j->url), "http://") | sb_cat(j->url, sizeof(j->url), j->host) | sb_cat(j->url, sizeof(j->url), ":");
+    cut |= sb_int(j->url, sizeof(j->url), j->port, 0) | sb_cat(j->url, sizeof(j->url), "/") | sb_cat(j->url, sizeof(j->url), j->path);
+    if (cut) return free(j->b.p), say(r, "Printer address is too long", "", -1), -1;
     return 0;
 }
 

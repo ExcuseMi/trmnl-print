@@ -14,5 +14,7 @@
 #include "../../src/flist.c"
 #include "../../src/appfs.c"
 #include "../../src/printjob.c"
+#include "../../src/printer.c"
 #include "../../src/pr.c"
+#include "../../src/prsetup.c"
 #include "../../src/prui.c"

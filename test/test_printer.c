@@ -4,6 +4,7 @@
 #include <string.h>
 #include "printer.h"
 #include "printjob.h"
+#include "strbuf.h"
 
 static void address(void)
 {
@@ -109,8 +110,27 @@ static void default_printer(void)
     CHECK(pj_default_printer(NULL, &p) == APP_EINVAL);
 }
 
+static void strbuf(void)
+{
+    char b[8];
+    CHECK(sb_set(b, sizeof(b), "abc") == 0 && !strcmp(b, "abc"));
+    CHECK(sb_cat(b, sizeof(b), "de") == 0 && !strcmp(b, "abcde"));
+    CHECK(sb_cat(b, sizeof(b), "fghij") == -1 && !strcmp(b, "abcdefg"));   /* cut to fit, terminated */
+    CHECK(sb_cat(b, sizeof(b), "x") == -1 && !strcmp(b, "abcdefg"));
+    CHECK(sb_set(b, 1, "abc") == -1 && !b[0]);
+    b[0] = 0;
+    CHECK(sb_int(b, sizeof(b), 0, 0) == 0 && !strcmp(b, "0"));
+    b[0] = 0;
+    CHECK(sb_int(b, sizeof(b), 631, 0) == 0 && !strcmp(b, "631"));
+    b[0] = 0;
+    CHECK(sb_int(b, sizeof(b), 7, 4) == 0 && !strcmp(b, "0007"));
+    b[0] = 0;
+    CHECK(sb_int(b, sizeof(b), 12345678, 0) == -1 && !strcmp(b, "1234567"));
+}
+
 int main(void)
 {
+    strbuf();
     address();
     cfg_round_trip();
     cfg_bad_files();

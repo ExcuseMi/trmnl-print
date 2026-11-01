@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #include "pr.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "imgfit.h"
 #include "pngio.h"
+#include "strbuf.h"
 
 static void set_note(pr_t *p, const char *s)
 {
@@ -51,8 +51,8 @@ void pr_printer(const pr_t *p, char *out, size_t cap)
     if (!p->have_def) return;
     char a[100];
     pj_printer_addr(&p->def, a, sizeof(a));
-    if (p->def.name[0]) snprintf(out, cap, "%s  %s", p->def.name, a);
-    else snprintf(out, cap, "%s", a);
+    if (p->def.name[0]) sb_set(out, cap, p->def.name), sb_cat(out, cap, "  "), sb_cat(out, cap, a);
+    else sb_set(out, cap, a);
 }
 
 /* Back to where the person came from: the caller when there is one (the glue launches it), else the list */
@@ -129,7 +129,7 @@ static int path_ok(const char *s)
 void pr_start_arg(pr_t *p, const char *arg)
 {
     if (!arg || !arg[0]) return;
-    if (!strncmp(arg, "setup:", 6)) { /* an app sends the person to set a printer up, and gets the screen back */
+    if (strlen(arg) >= 6 && !memcmp(arg, "setup:", 6)) { /* an app sends the person to set a printer up, and gets the screen back */
         size_t k = strlen(arg + 6);
         if (!name_ok(arg + 6, k)) {
             set_note(p, "Print was started with an argument it does not understand");
@@ -219,7 +219,7 @@ void pr_run_print(pr_t *p)
     const fl_entry_t *e = &p->cur;
     pj_net_t net = p->env->net;
     net.format = p->def.format;
-    int rc = !p->have_def ? (snprintf(p->res.msg, sizeof(p->res.msg), "No printer yet: set one up first"), -1)
+    int rc = !p->have_def ? (sb_set(p->res.msg, sizeof(p->res.msg), "No printer yet: set one up first"), -1)
              : e->kind == FL_PNG ? pj_print_png(&net, &p->def, p->data, p->data_n, &p->res)
                                  : pj_print_text(&net, &p->def, (const char *)p->data, p->data_n, &p->res);
     (void)rc;

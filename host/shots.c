@@ -98,17 +98,79 @@ typedef struct {
     ffs_t fs;
     pr_env_t env;
     cap_t cap;
+    char cfg[PJ_CFG_MAX];
+    int nfound; /* what the network search finds: up to 3 printers */
 } rig_t;
+static int rcfg_read(void *u, char *b, size_t cap)
+{
+    rig_t *r = u;
+    size_t n = strlen(r->cfg);
+    if (!n) return -1;
+    if (n > cap) n = cap;
+    memcpy(b, r->cfg, n);
+    return (int)n;
+}
+static int rcfg_write(void *u, const char *t, size_t n)
+{
+    rig_t *r = u;
+    memcpy(r->cfg, t, n);
+    r->cfg[n] = 0;
+    return 0;
+}
+static int rbrowse(void *u, app_browse_cb_t cb, void *ctx)
+{
+    rig_t *r = u;
+    if (r->nfound > 0) cb("Brother MFC-L2710DW series", "192.168.1.50", 631, "ipp/print", ctx);
+    if (r->nfound > 1) cb("HP LaserJet Pro M404", "192.168.1.61", 631, "ipp/print", ctx);
+    if (r->nfound > 2) cb("", "192.168.1.77", 9631, "", ctx);
+    return r->nfound;
+}
+static int64_t rnow(void *u) { return (void)u, 1793534400; }
 static int rread(void *u, const fl_entry_t *e, uint8_t **b, size_t *s) { return ffs_read(&((rig_t *)u)->fs, e, b, s); }
 static int rcfg(void *u, const char *k, char *b, int cap)
 {
-    (void)u;
-    if (strcmp(k, "format") || cap < 3) return -1;
-    memcpy(b, fmt_now, 3);
-    return 3;
+    (void)u, (void)k, (void)b, (void)cap;
+    return -1;
 }
 
 static int run(void);
+
+/* the printer setup screens, from a start without a default printer */
+static void setup_shots(rig_t *r)
+{
+    r->cfg[0] = 0;
+    r->nfound = 3;
+    pr_t p;
+    pr_init(&p, &r->env);
+    shot(&p, 0, "list-noprinter");
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP); /* the Printer row: finds at once */
+    shot(&p, 0, "finding");
+    pr_run_find(&p);
+    shot(&p, 0, "pick-found");
+    shot(&p, 1, "pick-found-portrait");
+    pr_touch(&p, APP_TOUCH_RIGHT, APP_GESTURE_TAP);
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP); /* choose the second */
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP); /* the Printer row again: the menu */
+    shot(&p, 0, "pick-menu");
+    p.psel = prs_items(&p) - 2; /* Test page */
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP);
+    shot(&p, 0, "test-ask");
+    pr_free(&p);
+    r->cfg[0] = 0;
+    r->nfound = 0;
+    pr_init(&p, &r->env);
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP);
+    pr_run_find(&p);
+    shot(&p, 0, "pick-none");
+    p.psel = 1; /* Enter address on the phone */
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP);
+    strcpy(p.share[0], "1. With your phone on the same Wi-Fi open:");
+    strcpy(p.share[1], "2. Then type the code:");
+    strcpy(p.share[2], "http://print.local");
+    strcpy(p.share[3], "Code: 123456");
+    shot(&p, 0, "fallback");
+    pr_free(&p);
+}
 
 int main(int argc, char **argv)
 {
@@ -131,7 +193,8 @@ static int run(void)
     }
     ffs_put(&r.fs, "writer/notes.md", TEXT, strlen(TEXT));
     ffs_put(&r.fs, "writer/shopping.txt", "milk\nbread\n", 11);
-    r.env = (pr_env_t){ { &r.fs, ffs_list, 0 }, rread, rcfg, { PJ_PWG, cap_post, &r.cap }, &r };
+    r.env = (pr_env_t){ { &r.fs, ffs_list, 0 }, rread, rcfg, { PJ_PWG, cap_post, &r.cap }, rcfg_read, rcfg_write, rbrowse, rnow, &r };
+    snprintf(r.cfg, sizeof(r.cfg), "name=Brother MFC-L2710DW series\nhost=192.168.1.50\nformat=%s\n", fmt_now);
     pr_t p;
     pr_init(&p, &r.env);
     p.sel = 2;
@@ -160,6 +223,7 @@ static int run(void)
     p.mode = PR_SETTINGS;
     shot(&p, 0, "settings");
     pr_free(&p);
+    if (!strcmp(fmt_now, "pwg")) setup_shots(&r);
     free(r.cap.b);
     free(png);
     ffs_free(&r.fs);
