@@ -1,0 +1,2 @@
+# For the firmware fork's apps/build.sh (paths relative to this folder). Run `make fonts` in the repo root first.
+-I../../src -I../../gen

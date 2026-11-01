@@ -1,0 +1,7 @@
+# weight size chars
+Medium 34
+Bold 34
+Bold 64
+Bold 110 0123456789
+Medium 46
+Bold 46
