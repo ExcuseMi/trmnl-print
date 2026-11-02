@@ -32,6 +32,8 @@ typedef struct {
 int pj_printer_parse(const char *s, pj_printer_t *p);
 /* The same text from a printer, "host[:port][/path]" with the port and path left out when they are the defaults */
 void pj_printer_addr(const pj_printer_t *p, char *out, size_t cap);
+/* What a screen calls the printer: its own name, else its address (cut to fit) */
+void pj_printer_label(const pj_printer_t *p, char *out, size_t cap);
 /* The file's text. Length, or < 0 if it does not fit in cap */
 int pj_cfg_format(const pj_printer_t *p, char *out, size_t cap);
 /* 0, or PJ_NO_PRINTER when the text holds no usable host */

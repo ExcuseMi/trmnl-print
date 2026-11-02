@@ -3,6 +3,7 @@
 #include "imgfit.h"
 #include "pcl.h"
 #include "pr.h"
+#include "strbuf.h"
 
 enum { BLK = GFX_BLACK, WHT = GFX_WHITE };
 
@@ -161,8 +162,14 @@ void pr_draw(const pr_t *p, gfx_t *g, const app_touchbar_t *bar)
     switch (p->mode) {
     case PR_LIST: draw_list(p, g); break;
     case PR_PREVIEW: draw_preview(p, g); break;
-    case PR_PRINTING: draw_msg(g, "Printing...", "Sending the page to the printer.", "This takes a few seconds."); break;
-    case PR_RESULT: draw_msg(g, p->res.pages && p->note[0] && p->res.jobs ? "Done" : "Not printed", p->note, ""); break;
+    case PR_PRINTING:
+    case PR_RESULT: { /* which printer it goes to (owner 2026-11-02) */
+        char to[80] = "", who[64] = "";
+        if (p->have_def) pj_printer_label(&p->def, who, sizeof(who)), sb_set(to, sizeof(to), "To: "), sb_cat(to, sizeof(to), who);
+        if (p->mode == PR_PRINTING) draw_msg(g, "Printing...", p->have_def ? to : "Sending the page to the printer.", "This takes a few seconds.");
+        else draw_msg(g, p->res.pages && p->note[0] && p->res.jobs ? "Done" : "Not printed", p->note, to);
+        break;
+    }
     case PR_SETTINGS: {
         text(g, face(1, 64), 50, 120, "Printer address", BLK);
         int y = 220;

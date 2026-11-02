@@ -80,6 +80,12 @@ void pj_printer_addr(const pj_printer_t *p, char *out, size_t cap)
     if (p->path[0] && strcmp(p->path, PJ_DEFAULT_PATH) != 0) sb_cat(out, cap, "/"), sb_cat(out, cap, p->path);
 }
 
+void pj_printer_label(const pj_printer_t *p, char *out, size_t cap)
+{
+    if (p->name[0]) sb_set(out, cap, p->name);
+    else pj_printer_addr(p, out, cap);
+}
+
 int pj_cfg_format(const pj_printer_t *p, char *out, size_t cap)
 {
     int bad = sb_set(out, cap, "name=");

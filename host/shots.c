@@ -155,6 +155,8 @@ static void setup_shots(rig_t *r)
     p.psel = prs_items(&p) - 2; /* Test page */
     pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP);
     shot(&p, 0, "test-ask");
+    pr_touch(&p, APP_TOUCH_MIDDLE, APP_GESTURE_TAP); /* Print: names the printer */
+    shot(&p, 0, "printing");
     pr_free(&p);
     r->cfg[0] = 0;
     r->nfound = 0;

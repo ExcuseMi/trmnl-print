@@ -177,10 +177,28 @@ static void strbuf(void)
     CHECK(sb_int(b, sizeof(b), 12345678, 0) == -1 && !strcmp(b, "1234567"));
 }
 
+/* What the screens call the printer (owner 2026-11-02: "mention which printer you are sending to"): its own name when
+   it has one, else its address; never empty for a usable printer, cut to fit */
+static void label(void)
+{
+    pj_printer_t p;
+    char a[100];
+    pj_printer_parse("192.168.1.50", &p);
+    pj_printer_label(&p, a, sizeof(a));
+    CHECK(!strcmp(a, "192.168.1.50"));
+    snprintf(p.name, sizeof(p.name), "Brother MFC-L2710DW series");
+    pj_printer_label(&p, a, sizeof(a));
+    CHECK(!strcmp(a, "Brother MFC-L2710DW series"));
+    char s[8];
+    pj_printer_label(&p, s, sizeof(s));
+    CHECK(strlen(s) == 7);
+}
+
 int main(void)
 {
     strbuf();
     address();
+    label();
     cfg_round_trip();
     cfg_bad_files();
     default_printer();
