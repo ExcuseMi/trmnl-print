@@ -317,8 +317,33 @@ static void test_argument(void)
     rig_free(&r);
 }
 
+/* No default yet, but the phone form holds an address (2026-11-02 on the X: "Default: none yet" and the device setting
+   empty while the address was typed on the phone): it becomes the default at once, saved */
+static void phone_address_becomes_the_default(void)
+{
+    static rig_t r;
+    rig_new(&r);
+    no_default(&r);
+    snprintf(r.printer, sizeof(r.printer), "192.0.2.40");
+    pr_t p;
+    pr_init(&p, &r.env);
+    prs_load(&p);
+    CHECK(p.have_def && !strcmp(p.def.host, "192.0.2.40") && p.def.port == 631);
+    CHECK(r.cfg_writes == 1 && r.cfg_n > 0);
+    pr_free(&p);
+    snprintf(r.printer, sizeof(r.printer), "not an address");
+    no_default(&r);
+    r.cfg_writes = 0;
+    pr_init(&p, &r.env);
+    prs_load(&p);
+    CHECK(!p.have_def && r.cfg_writes == 0); /* a bad text: nothing saved, no crash */
+    pr_free(&p);
+    rig_free(&r);
+}
+
 int main(void)
 {
+    phone_address_becomes_the_default();
     none_found();
     test_argument();
     one_found_is_saved_and_used();

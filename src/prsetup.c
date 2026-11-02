@@ -7,6 +7,22 @@
 
 static void note(pr_t *p, const char *s) { sb_set(p->note, sizeof(p->note), s); }
 
+static int save(pr_t *p, const pj_printer_t *pr);
+static void read_setting(const pr_t *p, const char *k, char *out, size_t cap);
+
+/* No default, but the phone form holds an address: that is the printer the person meant (2026-11-02 on the X) */
+static void adopt_phone_address(pr_t *p)
+{
+    if (!p->env->cfg_get) return;
+    char a[80], f[80];
+    read_setting(p, "printer", a, sizeof(a));
+    pj_printer_t n;
+    if (!a[0] || pj_printer_parse(a, &n) < 0) return;
+    read_setting(p, "format", f, sizeof(f));
+    n.format = !strcmp(f, "pcl") ? PJ_PCL : PJ_PWG;
+    save(p, &n);
+}
+
 void prs_load(pr_t *p)
 {
     char buf[PJ_CFG_BUF]; /* prcfg_read refuses a smaller one: the default never loaded (2026-11-02) */
@@ -16,6 +32,7 @@ void prs_load(pr_t *p)
     int n = p->env->cfg_read(p->env->u, buf, sizeof(buf));
     if (n > 0 && pj_cfg_parse(buf, (size_t)n, &p->def) == 0) p->have_def = 1;
     else memset(&p->def, 0, sizeof(p->def));
+    if (!p->have_def) adopt_phone_address(p);
 }
 
 static int save(pr_t *p, const pj_printer_t *pr)
