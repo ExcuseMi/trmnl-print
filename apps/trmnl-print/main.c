@@ -86,6 +86,7 @@ int app_main(const app_api_t *a)
     env.browse = f_browse;
     env.now = f_now;
     pr_init(&pr, &env);
+    api->log("default printer: %s", pr.have_def ? pr.def.host : "none"); /* the console shows what loaded */
     int sharing = 0, share_rc = 0;
     uint32_t sec = 0;
     if (api->size >= APP_API_SLOT(55)) {
