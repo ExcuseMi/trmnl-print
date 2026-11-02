@@ -15,6 +15,7 @@
 #define PJ_CFG_APP "trmnl-print"
 #define PJ_CFG_FILE "printer.cfg"
 #define PJ_CFG_MAX 512
+#define PJ_CFG_BUF (PJ_CFG_MAX + 1) /* the buffer pj_device_text and prcfg_read need: a smaller one is refused */
 #define PJ_DEFAULT_PORT 631
 #define PJ_DEFAULT_PATH "ipp/print"
 #define PJ_DEV_KEY "printer" /* API 2.11: device_setting_get/set key; the value is the same text, up to PJ_CFG_MAX + 1 bytes */

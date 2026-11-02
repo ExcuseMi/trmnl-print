@@ -34,6 +34,7 @@ static int rig_cfg(void *u, const char *k, char *b, int cap)
 static int rig_cfg_read(void *u, char *b, size_t cap)
 {
     rig_t *r = u;
+    if (cap < PJ_CFG_BUF) return -1; /* as prcfg_read on API 2.11 (pj_device_text) */
     if (r->cfg_n <= 0) return -1;
     size_t n = (size_t)r->cfg_n < cap ? (size_t)r->cfg_n : cap;
     memcpy(b, r->cfg, n);

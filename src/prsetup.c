@@ -9,7 +9,7 @@ static void note(pr_t *p, const char *s) { sb_set(p->note, sizeof(p->note), s); 
 
 void prs_load(pr_t *p)
 {
-    char buf[PJ_CFG_MAX];
+    char buf[PJ_CFG_BUF]; /* prcfg_read refuses a smaller one: the default never loaded (2026-11-02) */
     p->have_def = 0;
     memset(&p->def, 0, sizeof(p->def));
     if (!p->env->cfg_read) return;
