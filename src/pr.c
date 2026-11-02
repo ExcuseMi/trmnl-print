@@ -256,7 +256,11 @@ void pr_set_share(pr_t *p, int rc, const app_webshare_status_t *st)
     memset(p->share, 0, sizeof(p->share));
     size_t cap = sizeof(p->share[0]);
     if (rc != 0) {
-        put_s(p->share[0], cap, rc == APP_ENOMEM ? "Not enough memory for the Wi-Fi page." : rc == APP_ENONET ? "No Wi-Fi network could be started." : "The Wi-Fi page could not start.");
+        put_s(p->share[0], cap, rc == APP_ENOMEM   ? "Not enough memory for the Wi-Fi page."
+                                : rc == APP_ENONET ? "No Wi-Fi network could be started."
+                                : rc == APP_ENOENT ? "The X refused this app's settings. Update the X or the app."
+                                : rc == APP_EBUSY  ? "The Wi-Fi page is still closing. Try again in a moment."
+                                                   : "The Wi-Fi page could not start.");
         return;
     }
     if (!st->running) {

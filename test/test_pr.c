@@ -216,8 +216,30 @@ static void start_argument(void)
     rig_free(&r);
 }
 
+/* Every refusal of the phone page has its own line (2026-11-02: a refused settings form said only "could not start") */
+static void share_refusals(void)
+{
+    static rig_t r;
+    rig_new(&r);
+    pr_t p;
+    pr_init(&p, &r.env);
+    app_webshare_status_t st;
+    memset(&st, 0, sizeof(st));
+    const int rcs[] = { APP_ENOMEM, APP_ENONET, APP_ENOENT, APP_EBUSY, APP_EINVAL };
+    char seen[5][sizeof(p.share[0])];
+    for (unsigned i = 0; i < 5; i++) {
+        pr_set_share(&p, rcs[i], &st);
+        CHECK(p.share[0][0]);
+        memcpy(seen[i], p.share[0], sizeof(seen[i]));
+        for (unsigned j = 0; j < i; j++) CHECK(strcmp(seen[i], seen[j]) != 0);
+    }
+    pr_free(&p);
+    rig_free(&r);
+}
+
 int main(void)
 {
+    share_refusals();
     start_argument();
     navigation();
     printer_row();
