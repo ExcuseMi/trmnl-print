@@ -86,13 +86,13 @@ int app_main(const app_api_t *a)
     env.browse = f_browse;
     env.now = f_now;
     pr_init(&pr, &env);
-    api->log("default printer: %s", pr.have_def ? pr.def.host : "none"); /* the console shows what loaded */
     int sharing = 0, share_rc = 0;
     uint32_t sec = 0;
     if (api->size >= APP_API_SLOT(55)) {
         char arg[129];
         if (api->app_arg(arg, sizeof(arg)) > 0) pr_start_arg(&pr, arg);
     }
+    api->log("default printer: %s", pr.have_def ? pr.def.host : "none"); /* the console shows what loaded */
     pr_draw(&pr, &g, &bar);
     push(1);
     for (;;) {

@@ -45,6 +45,25 @@ static int save(pr_t *p, const pj_printer_t *pr)
     return 0;
 }
 
+int prs_set_default_text(pr_t *p, const char *addr)
+{
+    pj_printer_t n;
+    if (!addr || pj_printer_parse(addr, &n) < 0) {
+        note(p, "That printer address is not one Print understands");
+        return -1;
+    }
+    if (save(p, &n) < 0) {
+        note(p, "The printer could not be saved");
+        return -1;
+    }
+    char a[100];
+    pj_printer_addr(&p->def, a, sizeof(a));
+    char m[140] = "Default printer: ";
+    sb_cat(m, sizeof(m), a);
+    note(p, m);
+    return 0;
+}
+
 int prs_items(const pr_t *p) { return p->nfound + 2 + (p->have_def ? 1 : 0) + 1; }
 
 int prs_kind(const pr_t *p, int i)

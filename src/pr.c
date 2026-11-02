@@ -135,6 +135,10 @@ void pr_start_arg(pr_t *p, const char *arg)
         else set_note(p, "No printer yet: set one up in Print"), p->mode = PR_RESULT;
         return;
     }
+    if (strlen(arg) > 8 && !memcmp(arg, "printer:", 8)) { /* a default from the cable (TAPP RUN): the phone form may be out of reach */
+        prs_set_default_text(p, arg + 8);
+        return;
+    }
     if (strlen(arg) >= 6 && !memcmp(arg, "setup:", 6)) { /* an app sends the person to set a printer up, and gets the screen back */
         size_t k = strlen(arg + 6);
         if (!name_ok(arg + 6, k)) {

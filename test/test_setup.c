@@ -341,8 +341,34 @@ static void phone_address_becomes_the_default(void)
     rig_free(&r);
 }
 
+/* "printer:<address>" as the start argument (a cable TAPP RUN): saved as the default, owner's X 2026-11-02 could not
+   reach the phone form; a bad address saves nothing and says so */
+static void printer_argument_sets_the_default(void)
+{
+    static rig_t r;
+    rig_new(&r);
+    no_default(&r);
+    pr_t p;
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "printer:192.0.2.40");
+    CHECK(p.have_def && !strcmp(p.def.host, "192.0.2.40") && p.def.port == 631 && (!p.def.path[0] || !strcmp(p.def.path, PJ_DEFAULT_PATH)));
+    CHECK(r.cfg_writes == 1);
+    pr_free(&p);
+    pr_init(&p, &r.env); /* the next start reads it back */
+    CHECK(p.have_def && !strcmp(p.def.host, "192.0.2.40"));
+    pr_free(&p);
+    no_default(&r);
+    r.cfg_writes = 0;
+    pr_init(&p, &r.env);
+    pr_start_arg(&p, "printer:not an address");
+    CHECK(!p.have_def && r.cfg_writes == 0 && p.note[0]);
+    pr_free(&p);
+    rig_free(&r);
+}
+
 int main(void)
 {
+    printer_argument_sets_the_default();
     phone_address_becomes_the_default();
     none_found();
     test_argument();

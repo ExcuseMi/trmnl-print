@@ -80,6 +80,8 @@ void pr_printer(const pr_t *p, char *out, size_t cap);
 void pr_run_find(pr_t *p);
 /* printer setup (prsetup.c) */
 void prs_load(pr_t *p);
+/* "printer:<address>" start argument: the address (pj_printer_parse) saved as the default; -1 and a note when bad */
+int prs_set_default_text(pr_t *p, const char *addr);
 void prs_open(pr_t *p, int back_to);       /* the printer menu; searches at once when there is no default */
 void prs_touch(pr_t *p, int zone, int gesture); /* PR_PICK and PR_TESTASK */
 void prs_settings_closed(pr_t *p);          /* the phone page was left: a changed value is applied */
