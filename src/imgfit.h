@@ -25,6 +25,15 @@ int fit_compute(int sw, int sh, int page_w, int page_h, fit_t *f);
 /* Row y (0..f->h-1) of the printed region into out (f->w / 8 bytes, 1 = white). A destination pixel is ink when at
    least half of the picture pixels it covers are ink. */
 void fit_row(const img_t *im, const fit_t *f, int y, uint8_t *out);
+/* fit_row with the last row kept: a printer row of the same picture rows as the row before is a copy (Sketch's page
+   enlarged to A4 at 600 dpi repeats each row about 3 times). Zero `valid` before the first row of a picture. */
+#define IMG_ROW_BYTES 620 /* a PWG A4 row (4960 px) */
+typedef struct {
+    int valid, y0, y1;
+    uint8_t row[IMG_ROW_BYTES];
+    uint16_t x0[IMG_ROW_BYTES * 8], x1[IMG_ROW_BYTES * 8]; /* each printer column's picture columns */
+} fit_cache_t;
+void fit_row_cached(const img_t *im, const fit_t *f, fit_cache_t *c, int y, uint8_t *out);
 /* The size of a PNG from its header; 0, or < 0 if it is not a PNG */
 int png_dims(const uint8_t *in, size_t n, int *w, int *h);
 #endif

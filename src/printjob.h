@@ -39,4 +39,11 @@ int pj_print_png(const pj_net_t *net, const pj_printer_t *printer, const uint8_t
 int pj_print_text(const pj_net_t *net, const pj_printer_t *printer, const char *text, size_t n, pj_result_t *r);
 /* A 1-bit picture (1 = white, `stride` bytes a row), fitted to the page like a PNG; for pages the app draws itself */
 int pj_print_bitmap(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *px, int w, int h, int stride, pj_result_t *r);
+/* A PNG's job a few rows at a time, so an app keeps its input and screen going: start reads the picture (0 with r->msg
+   on a failure); each step makes up to `rows` printer rows and posts the job after the last one: 1 while rows are left,
+   0 sent, < 0 failed (r->msg set either way; r must live until the last step). Free it after the last step or to give up. */
+typedef struct pj_job pj_job_t;
+pj_job_t *pj_png_start(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *file, size_t n, pj_result_t *r);
+int pj_job_step(pj_job_t *j, int rows);
+void pj_job_free(pj_job_t *j);
 #endif

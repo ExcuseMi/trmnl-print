@@ -40,4 +40,13 @@ void pcl_job_begin(pcl_out_t *o); /* reset, A4, portrait, 300 dpi units */
 void pcl_job_end(pcl_out_t *o);   /* reset */
 /* One page: the region as raster graphics, then a form feed. Returns 0 or < 0 (output error or a row callback's) */
 int pcl_page(pcl_out_t *o, const pcl_region_t *r);
+/* The same page a few rows at a time: begin writes the raster start, each step up to `rows` rows (1 while rows are
+   left, 0 after the page's end, < 0 on an error) */
+typedef struct {
+    pcl_out_t *o;
+    pcl_region_t r;
+    int j;
+} pcl_run_t;
+int pcl_page_begin(pcl_run_t *p, pcl_out_t *o, const pcl_region_t *r);
+int pcl_page_step(pcl_run_t *p, int rows);
 #endif

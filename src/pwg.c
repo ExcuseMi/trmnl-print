@@ -89,14 +89,7 @@ static void header(uint8_t *h)
     put32(h, 480, 0x00ffffff);              /* alternate primary: white */
 }
 
-typedef struct {
-    pcl_out_t *o;
-    uint8_t prev[PWG_PAGE_W], enc[PWG_ENC_MAX(PWG_PAGE_W)];
-    size_t enc_n;
-    int repeat; /* how many times the held line is wanted, 0: none held */
-} lines_t;
-
-static void flush(lines_t *l)
+static void flush(pwg_lines_t *l)
 {
     if (!l->repeat) return;
     uint8_t c = (uint8_t)(l->repeat - 1);
@@ -105,10 +98,16 @@ static void flush(lines_t *l)
     l->repeat = 0;
 }
 
-static void line(lines_t *l, const uint8_t *cur)
+/* `same`: the caller knows the line is the one before (the same picture row, or white again) */
+static void line(pwg_lines_t *l, const uint8_t *cur, int same)
 {
-    if (l->repeat && l->repeat < 256 && !memcmp(l->prev, cur, PWG_PAGE_W)) {
-        l->repeat++;
+    if (l->repeat && (same || !memcmp(l->prev, cur, PWG_PAGE_W))) {
+        if (l->repeat < 256) {
+            l->repeat++;
+            return;
+        }
+        flush(l); /* the held line, encoded already, starts again */
+        l->repeat = 1;
         return;
     }
     flush(l);
@@ -117,36 +116,77 @@ static void line(lines_t *l, const uint8_t *cur)
     l->repeat = 1;
 }
 
-int pwg_page(pcl_out_t *o, const pcl_region_t *r, int scale)
+/* 8 gray bytes of each 1-bit byte */
+static uint8_t lut[256][8];
+static void lut_init(void)
+{
+    if (lut[0][0] == 0 && lut[255][0] == 0xff) return;
+    for (int b = 0; b < 256; b++)
+        for (int k = 0; k < 8; k++) lut[b][k] = (b & (0x80 >> k)) ? 0xff : 0;
+}
+
+/* the region's row into cur: 1 bit to 8, `scale` times wide */
+static void expand(pwg_run_t *p, const uint8_t *src)
+{
+    uint8_t *d = p->cur + p->x0;
+    int full = p->r.w / 8, scale = p->scale;
+    if (scale == 1)
+        for (int i = 0; i < full; i++) memcpy(d + 8 * i, lut[src[i]], 8);
+    else
+        for (int i = 0; i < full; i++)
+            for (int k = 0; k < 8; k++) d[16 * i + 2 * k] = d[16 * i + 2 * k + 1] = lut[src[i]][k];
+    for (long px = (long)full * 8 * scale; px < p->rw; px++) d[px] = (src[(px / scale) >> 3] & (0x80 >> ((px / scale) & 7))) ? 0xff : 0;
+}
+
+int pwg_page_begin(pwg_run_t *p, pcl_out_t *o, const pcl_region_t *r, int scale)
 {
     long rw = (long)r->w * scale;
     if (scale < 1 || scale > 2 || r->w <= 0 || r->h <= 0 || r->x < 0 || r->y < 0 || (long)r->x * scale + rw > PWG_PAGE_W || ((long)r->y + r->h) * scale > PWG_PAGE_H) return -1;
-    static uint8_t cur[PWG_PAGE_W], src[PWG_PAGE_W / 8];
-    static lines_t L;
+    lut_init();
     uint8_t h[PWG_HEADER];
     header(h);
     out(o, h, sizeof(h));
-    L.o = o;
-    L.repeat = 0;
-    long y0 = (long)r->y * scale, y1 = y0 + (long)r->h * scale;
-    long x0 = (long)r->x * scale;
-    int have_row = -1;
-    for (long y = 0; y < PWG_PAGE_H && !o->err; y++) {
-        if (y < y0 || y >= y1) {
-            memset(cur, 0xff, sizeof(cur));
+    p->o = o, p->r = *r, p->scale = scale, p->rw = rw;
+    p->L.o = o;
+    p->L.repeat = 0;
+    p->y = 0, p->y0 = (long)r->y * scale, p->y1 = p->y0 + (long)r->h * scale, p->x0 = (long)r->x * scale;
+    p->have_row = -1, p->white = 0, p->k = 0;
+    return o->err;
+}
+
+int pwg_page_step(pwg_run_t *p, int rows)
+{
+    pcl_out_t *o = p->o;
+    for (int n = 0; n < rows && p->y < PWG_PAGE_H && !o->err; n++, p->y++) {
+        int same = 0;
+        if (p->y < p->y0 || p->y >= p->y1) {
+            same = p->white;
+            if (!same) memset(p->cur, 0xff, sizeof(p->cur)), p->white = 1, p->have_row = -1;
         } else {
-            int j = (int)((y - y0) / scale);
-            if (j != have_row) {
-                int rc = r->get_row(r->u, j, src);
-                if (rc < 0) return flush(&L), rc;
-                have_row = j;
-                memset(cur, 0xff, sizeof(cur));
-                for (long px = 0; px < rw; px++)
-                    if (!(src[(px / scale) >> 3] & (0x80 >> ((px / scale) & 7)))) cur[x0 + px] = 0;
+            int j = (int)((p->y - p->y0) / p->scale);
+            same = j == p->have_row;
+            if (!same) {
+                uint8_t *src = p->src[p->k ^ 1];
+                int rc = p->r.get_row(p->r.u, j, src);
+                if (rc < 0) return flush(&p->L), rc;
+                same = p->have_row >= 0 && p->r.w % 8 == 0 && !memcmp(src, p->src[p->k], (size_t)p->r.w / 8);
+                if (!same) expand(p, src); /* outside the region cur stays white */
+                p->k ^= 1, p->have_row = j, p->white = 0;
             }
         }
-        line(&L, cur);
+        line(&p->L, p->cur, same);
     }
-    flush(&L);
+    if (o->err) return o->err;
+    if (p->y < PWG_PAGE_H) return 1;
+    flush(&p->L);
     return o->err;
+}
+
+int pwg_page(pcl_out_t *o, const pcl_region_t *r, int scale)
+{
+    static pwg_run_t P;
+    int rc = pwg_page_begin(&P, o, r, scale);
+    if (rc < 0) return rc;
+    while ((rc = pwg_page_step(&P, PWG_PAGE_H)) > 0) {}
+    return rc;
 }

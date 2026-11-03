@@ -25,4 +25,23 @@ void pwg_job_end(pcl_out_t *o);   /* nothing: the stream ends with the last page
 /* One A4 page. The region is 1 bit (1 = white) in units of `scale` pixels (1: 600 dpi, 2: a 300 dpi region doubled).
    Returns 0 or < 0 (output error or a row callback's). */
 int pwg_page(pcl_out_t *o, const pcl_region_t *r, int scale);
+
+/* The same page a few rows at a time (an app keeps its input going between steps): begin writes the header, each step
+   up to `rows` printer rows; a step returns 1 while rows are left, 0 at the end of the page, < 0 on an error. */
+typedef struct {
+    pcl_out_t *o;
+    uint8_t prev[PWG_PAGE_W], enc[PWG_ENC_MAX(PWG_PAGE_W)];
+    size_t enc_n;
+    int repeat; /* how many times the held line is wanted, 0: none held */
+} pwg_lines_t;
+typedef struct {
+    pcl_out_t *o;
+    pcl_region_t r;
+    int scale, have_row, white, k;
+    long y, y0, y1, x0, rw;
+    uint8_t cur[PWG_PAGE_W], src[2][PWG_PAGE_W / 8];
+    pwg_lines_t L;
+} pwg_run_t;
+int pwg_page_begin(pwg_run_t *p, pcl_out_t *o, const pcl_region_t *r, int scale);
+int pwg_page_step(pwg_run_t *p, int rows);
 #endif

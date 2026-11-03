@@ -75,7 +75,7 @@ static int job_open(job_t *j, const pj_net_t *net, const pj_printer_t *printer, 
     j->b.cap = cap;
     int cut = sb_set(j->url, sizeof(j->url), "http://") | sb_cat(j->url, sizeof(j->url), j->host) | sb_cat(j->url, sizeof(j->url), ":");
     cut |= sb_int(j->url, sizeof(j->url), j->port, 0) | sb_cat(j->url, sizeof(j->url), "/") | sb_cat(j->url, sizeof(j->url), j->path);
-    if (cut) return free(j->b.p), say(r, "Printer address is too long", "", -1), -1;
+    if (cut) return free(j->b.p), j->b.p = 0, say(r, "Printer address is too long", "", -1), -1;
     return 0;
 }
 
@@ -110,8 +110,16 @@ static int job_send(job_t *j)
 static int pj_done(job_t *j, int rc)
 {
     free(j->b.p);
+    j->b.p = 0;
     if (rc == 0) say(j->r, j->r->pages == 1 ? "Sent 1 page to the printer" : "Sent pages to the printer: ", "", j->r->pages == 1 ? -1 : j->r->pages);
     return rc;
+}
+
+/* A page that could not be written whole: the words for it (one page in the job: it does not fit at all) */
+static int page_failed(job_t *j, int rc)
+{
+    if (rc != PJ_FULL) return say(j->r, "The page could not be made", "", -1), -1;
+    return say(j->r, "The page is too big for the memory of the X", "", -1), -1;
 }
 
 /* Writes one page into the current job; when it does not fit, sends what is there first and starts a new job */
@@ -125,9 +133,9 @@ static int job_page(job_t *j, const pcl_region_t *reg, int scale)
             j->r->pages++;
             return 0;
         }
-        if (rc != PJ_FULL) return say(j->r, "The page could not be made", "", -1), -1;
+        if (rc != PJ_FULL) return page_failed(j, rc);
         j->b.n = j->mark; /* drop the half page */
-        if (j->mark == j->header) return say(j->r, "The page is too big for the memory of the X", "", -1), -1;
+        if (j->mark == j->header) return page_failed(j, rc);
         if (job_send(j) < 0) return -1;
         job_start(j);
     }
@@ -137,51 +145,101 @@ static int job_page(job_t *j, const pcl_region_t *reg, int scale)
 typedef struct {
     img_t im;
     fit_t f;
+    fit_cache_t c;
 } pic_t;
 
 static int pic_row(void *u, int y, uint8_t *row)
 {
     pic_t *p = u;
-    fit_row(&p->im, &p->f, y, row);
+    fit_row_cached(&p->im, &p->f, &p->c, y, row);
     return 0;
 }
 
-static int print_img(const pj_net_t *net, const pj_printer_t *printer, uint8_t *px, int w, int h, int stride, pj_result_t *r)
-{
-    pic_t pic;
-    pic.im.w = w, pic.im.h = h, pic.im.stride = stride;
-    pic.im.px = px;
-    int pwg = net->format != PJ_PCL;
-    fit_compute(w, h, pwg ? PWG_PAGE_W : PCL_PAGE_W, pwg ? PWG_PAGE_H : PCL_PAGE_H, &pic.f);
+/* A picture's job, made a few rows at a time (pj_job_step) */
+struct pj_job {
+    pj_net_t net;
     job_t j;
-    if (job_open(&j, net, printer, r) < 0) return -1;
-    job_start(&j);
-    pcl_region_t reg = { pic.f.x, pic.f.y, pic.f.w, pic.f.h, pic_row, &pic };
-    int rc = job_page(&j, &reg, 1);
-    if (rc == 0) rc = job_send(&j);
-    return pj_done(&j, rc);
+    pic_t pic;
+    uint8_t *own; /* the decoded picture, when the job made it */
+    pcl_out_t o;
+    int done;
+    union {
+        pwg_run_t pwg;
+        pcl_run_t pcl;
+    } run;
+};
+
+void pj_job_free(pj_job_t *J)
+{
+    if (!J) return;
+    free(J->j.b.p);
+    free(J->own);
+    free(J);
+}
+
+static pj_job_t *img_start(const pj_net_t *net, const pj_printer_t *printer, uint8_t *px, uint8_t *own, int w, int h, int stride, pj_result_t *r)
+{
+    pj_job_t *J = calloc(1, sizeof(*J));
+    if (!J) return free(own), say(r, "Not enough memory to print", "", -1), (pj_job_t *)0;
+    J->net = *net;
+    J->own = own;
+    pic_t *p = &J->pic;
+    p->im.w = w, p->im.h = h, p->im.stride = stride, p->im.px = px;
+    int pwg = net->format != PJ_PCL;
+    fit_compute(w, h, pwg ? PWG_PAGE_W : PCL_PAGE_W, pwg ? PWG_PAGE_H : PCL_PAGE_H, &p->f);
+    if (job_open(&J->j, &J->net, printer, r) < 0) return pj_job_free(J), (pj_job_t *)0;
+    job_start(&J->j);
+    pcl_region_t reg = { p->f.x, p->f.y, p->f.w, p->f.h, pic_row, p };
+    J->o = (pcl_out_t){ buf_write, &J->j.b, 0, 0 };
+    int rc = pwg ? pwg_page_begin(&J->run.pwg, &J->o, &reg, 1) : pcl_page_begin(&J->run.pcl, &J->o, &reg);
+    if (rc < 0) return page_failed(&J->j, rc), pj_job_free(J), (pj_job_t *)0;
+    return J;
+}
+
+int pj_job_step(pj_job_t *J, int rows)
+{
+    if (J->done) return J->done < 0 ? -1 : 0;
+    int rc = J->net.format != PJ_PCL ? pwg_page_step(&J->run.pwg, rows) : pcl_page_step(&J->run.pcl, rows);
+    if (rc > 0) return 1;
+    if (rc == 0) J->j.r->pages++, rc = job_send(&J->j);
+    else rc = page_failed(&J->j, rc);
+    rc = pj_done(&J->j, rc);
+    J->done = rc < 0 ? -1 : 1;
+    return rc;
+}
+
+static int run_all(pj_job_t *J)
+{
+    if (!J) return -1;
+    int rc;
+    while ((rc = pj_job_step(J, 1 << 30)) > 0) {}
+    pj_job_free(J);
+    return rc;
+}
+
+pj_job_t *pj_png_start(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *file, size_t n, pj_result_t *r)
+{
+    memset(r, 0, sizeof(*r));
+    int w, h;
+    if (png_dims(file, n, &w, &h) < 0) return say(r, "Not a PNG this app can read", "", -1), (pj_job_t *)0;
+    int stride = (w + 7) / 8;
+    if ((size_t)stride * (size_t)h > IMG_MAX_BYTES) return say(r, "The picture is too big", "", -1), (pj_job_t *)0;
+    uint8_t *px = malloc((size_t)stride * (size_t)h);
+    if (!px) return say(r, "Not enough memory to print", "", -1), (pj_job_t *)0;
+    if (png_decode(file, n, px, w, h, stride) < 0) return free(px), say(r, "Not a 1-bit PNG (only Sketch pictures are read)", "", -1), (pj_job_t *)0;
+    return img_start(net, printer, px, px, w, h, stride, r);
 }
 
 int pj_print_png(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *file, size_t n, pj_result_t *r)
 {
-    memset(r, 0, sizeof(*r));
-    int w, h;
-    if (png_dims(file, n, &w, &h) < 0) return say(r, "Not a PNG this app can read", "", -1), -1;
-    int stride = (w + 7) / 8;
-    if ((size_t)stride * (size_t)h > IMG_MAX_BYTES) return say(r, "The picture is too big", "", -1), -1;
-    uint8_t *px = malloc((size_t)stride * (size_t)h);
-    if (!px) return say(r, "Not enough memory to print", "", -1), -1;
-    if (png_decode(file, n, px, w, h, stride) < 0) return free(px), say(r, "Not a 1-bit PNG (only Sketch pictures are read)", "", -1), -1;
-    int rc = print_img(net, printer, px, w, h, stride, r);
-    free(px);
-    return rc;
+    return run_all(pj_png_start(net, printer, file, n, r));
 }
 
 int pj_print_bitmap(const pj_net_t *net, const pj_printer_t *printer, const uint8_t *px, int w, int h, int stride, pj_result_t *r)
 {
     memset(r, 0, sizeof(*r));
     if (!px || w < 8 || h < 1 || stride < (w + 7) / 8 || (size_t)stride * (size_t)h > IMG_MAX_BYTES) return say(r, "The page could not be made", "", -1), -1;
-    return print_img(net, printer, (uint8_t *)px, w, h, stride, r);
+    return run_all(img_start(net, printer, (uint8_t *)px, 0, w, h, stride, r));
 }
 
 typedef struct {

@@ -77,27 +77,46 @@ void pcl_job_begin(pcl_out_t *o)
 
 void pcl_job_end(pcl_out_t *o) { pcl_emit(o, "\x1b" "E", 2); }
 
-int pcl_page(pcl_out_t *o, const pcl_region_t *r)
+int pcl_page_begin(pcl_run_t *p, pcl_out_t *o, const pcl_region_t *r)
 {
     if (r->w <= 0 || r->h <= 0 || r->w > PCL_PAGE_W || r->h > PCL_PAGE_H) return -1;
-    int rb = r->w / 8, x = r->x - PCL_OFF_X, y = r->y - PCL_OFF_Y;
+    int x = r->x - PCL_OFF_X, y = r->y - PCL_OFF_Y;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    uint8_t row[PCL_PAGE_W / 8], enc[PCL_PAGE_W / 8 + PCL_PAGE_W / 8 / 128 + 2];
+    p->o = o, p->r = *r, p->j = 0;
     pcl_emitf(o, "\x1b*p", x, 'X');
     pcl_emitf(o, "\x1b*p", y, 'Y');
     pcl_emit(o, "\x1b*t300R", 7);        /* 300 dpi */
     pcl_emit(o, "\x1b*r1A", 5);          /* start raster at the cursor */
     pcl_emit(o, "\x1b*b2M", 5);          /* PackBits rows */
-    for (int j = 0; j < r->h && !o->err; j++) {
-        int rc = r->get_row(r->u, j, row);
+    return o->err;
+}
+
+int pcl_page_step(pcl_run_t *p, int rows)
+{
+    pcl_out_t *o = p->o;
+    int rb = p->r.w / 8;
+    uint8_t row[PCL_PAGE_W / 8], enc[PCL_PAGE_W / 8 + PCL_PAGE_W / 8 / 128 + 2];
+    for (int n = 0; n < rows && p->j < p->r.h && !o->err; n++, p->j++) {
+        int rc = p->r.get_row(p->r.u, p->j, row);
         if (rc < 0) return rc;
         for (int i = 0; i < rb; i++) row[i] = (uint8_t)~row[i]; /* PCL: 1 = ink */
-        size_t n = packbits_encode(row, (size_t)rb, enc);
-        pcl_emitf(o, "\x1b*b", (int)n, 'W');
-        pcl_emit(o, enc, n);
+        size_t k = packbits_encode(row, (size_t)rb, enc);
+        pcl_emitf(o, "\x1b*b", (int)k, 'W');
+        pcl_emit(o, enc, k);
     }
+    if (o->err) return o->err;
+    if (p->j < p->r.h) return 1;
     pcl_emit(o, "\x1b*rB", 4);           /* end raster */
     pcl_emit(o, "\f", 1);
     return o->err;
+}
+
+int pcl_page(pcl_out_t *o, const pcl_region_t *r)
+{
+    pcl_run_t p;
+    int rc = pcl_page_begin(&p, o, r);
+    if (rc < 0) return rc;
+    while ((rc = pcl_page_step(&p, PCL_PAGE_H)) > 0) {}
+    return rc;
 }
