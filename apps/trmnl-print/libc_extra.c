@@ -1,7 +1,7 @@
 /* libc calls the X's loader does not export (its table: elf_loader's esp_elf_symbol.c): the compiler emits memmove for
    overlapping copies, and the X refused the app at start ("needs a function the firmware lacks", device 2026-10-31).
    apps/build.sh's import check is the guard; -fvisibility=hidden keeps these inside the app.
-   SPDX-License-Identifier: MIT */
+   SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include <stddef.h>
 
 /* no loop-to-call rewrite here, or the body would call itself */

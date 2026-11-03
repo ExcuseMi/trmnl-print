@@ -1,6 +1,6 @@
 /* PWG raster (PWG 5102.4, "RaS2"): what AirPrint-class printers take as image/pwg-raster. 8-bit sGray at 600 dpi on A4
    (4960 x 7016), rows PackBits-like encoded with a line repeat, so a white page is a few KB. Rows are encoded as they come,
-   one distinct line in memory at a time. SPDX-License-Identifier: MIT */
+   one distinct line in memory at a time. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PWG_H
 #define PWG_H
 #include <stddef.h>

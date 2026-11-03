@@ -1,6 +1,6 @@
 /* The X's position (API 2.5) with the fallbacks for older firmware: follow it, the bar's zones, the orientation
    event. The same small header sits in the Game Boy app (apps/trmnl-x/src/app_orient.h): apps/common of the firmware
-   fork is not ours to change. SPDX-License-Identifier: MIT */
+   fork is not ours to change. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef APP_ORIENT_H
 #define APP_ORIENT_H
 #include <app_api.h>

@@ -1,4 +1,4 @@
-/* Baked bitmap fonts (gen/fonts_gen.c from tools/bake_fonts.py) and text measuring. SPDX-License-Identifier: MIT */
+/* Baked bitmap fonts (gen/fonts_gen.c from tools/bake_fonts.py) and text measuring. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef FONT_H
 #define FONT_H
 #include <stdint.h>

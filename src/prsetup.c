@@ -1,5 +1,5 @@
 /* The Print app's printer setup: finding printers on the network, the default printer file, the phone fallback and the
-   test page. SPDX-License-Identifier: MIT */
+   test page. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include <stdlib.h>
 #include <string.h>
 #include "pr.h"

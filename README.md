@@ -26,3 +26,7 @@ With `api->size >= APP_API_SLOT(53)` the list shows every app's files (`file_lis
 Limits: only 1-bit PNGs of Sketch's writer are read (`pngio.c`); a full text page is about 520 KB as PWG (150 KB as PCL), a job holds 1 MB, more pages go as further jobs; a page that alone exceeds the buffer is refused with a message. Unproven on the real printer.
 
 `make test` (host, ASan/UBSan), `make shots`, `make render` (PWG through CUPS rastertopdf, PCL through gpcl6), `make elf`, `tools/mutate.sh` (red checks).
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE): free to use, change and share for any noncommercial purpose, at home, in schools and in other noncommercial organisations. Commercial use needs a separate licence from the author: open an issue to ask. Versions released before this change stay MIT. The Barlow Condensed fonts keep the SIL Open Font License.

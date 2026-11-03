@@ -1,4 +1,4 @@
-/* The controller's test rig: files, a printer that records, the printer.cfg file, a network search with set results. SPDX-License-Identifier: MIT */
+/* The controller's test rig: files, a printer that records, the printer.cfg file, a network search with set results. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef RIG_H
 #define RIG_H
 #define _GNU_SOURCE

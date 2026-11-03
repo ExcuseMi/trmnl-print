@@ -21,6 +21,7 @@ build/%: test/%.c $(CORE) $(HOST) test/check.h $(wildcard test/*.h src/*.h host/
 	@mkdir -p build
 	$(CC) $(CFLAGS) $< $(CORE) $(HOST) -o $@ -lm -lz -lstdc++
 test: $(TESTS)
+	@./tools/check_license.sh
 	@for t in $(TESTS); do ./$$t || exit 1; done
 build/shots: host/shots.c host/png.c $(CORE) $(HOST) $(wildcard src/*.h host/*.h)
 	@mkdir -p build

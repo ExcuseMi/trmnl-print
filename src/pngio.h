@@ -1,7 +1,7 @@
 /* A 1-bit grayscale PNG writer and reader for the page files, small and with no library: rows are filtered "Up",
    deflate is one fixed-Huffman block of literals and byte runs (a white page with a sketch is a few KB). The reader
    takes what the writer makes (and any PNG of the same kind: stored or fixed blocks, filters none, sub, up); any
-   other file is an error and nothing is changed. SPDX-License-Identifier: MIT */
+   other file is an error and nothing is changed. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PNGIO_H
 #define PNGIO_H
 #include <stddef.h>

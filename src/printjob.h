@@ -1,6 +1,6 @@
 /* Printing: a PNG or a text becomes PCL pages, packed into IPP Print-Job requests that the app posts to the printer.
    The network is a callback (the X's http_request on the device, a fake in the tests), so every failure path can be
-   tested. A job holds up to PJ_JOB_BYTES; more pages go as further jobs, in order. SPDX-License-Identifier: MIT */
+   tested. A job holds up to PJ_JOB_BYTES; more pages go as further jobs, in order. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PRINTJOB_H
 #define PRINTJOB_H
 #include <stddef.h>

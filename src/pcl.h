@@ -1,5 +1,5 @@
 /* PCL5 raster output for an A4 page at 300 dpi, 1 bit: the byte stream a laser printer takes on port 9100 or in an
-   IPP job. Rows come from a callback, one at a time, so a page never sits in memory whole. SPDX-License-Identifier: MIT */
+   IPP job. Rows come from a callback, one at a time, so a page never sits in memory whole. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PCL_H
 #define PCL_H
 #include <stddef.h>

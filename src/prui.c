@@ -1,4 +1,4 @@
-/* The Print app's screens. SPDX-License-Identifier: MIT */
+/* The Print app's screens. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include <string.h>
 #include "imgfit.h"
 #include "pcl.h"

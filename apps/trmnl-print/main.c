@@ -1,5 +1,5 @@
 /* Print for the TRMNL X: list files, preview, print on a network printer (IPP with PCL pages over http_request: the
-   app API has no raw socket). Everything it decides is in src/pr.c, tested on the host. SPDX-License-Identifier: MIT */
+   app API has no raw socket). Everything it decides is in src/pr.c, tested on the host. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include <app_api.h>
 #include <stdlib.h>
 #include <string.h>

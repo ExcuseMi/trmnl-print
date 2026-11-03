@@ -1,4 +1,4 @@
-/* A4 fit and centring of a picture, the rows it makes, the PNG header read. SPDX-License-Identifier: MIT */
+/* A4 fit and centring of a picture, the rows it makes, the PNG header read. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdlib.h>
 #include <string.h>

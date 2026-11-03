@@ -1,4 +1,4 @@
-/* PWG raster: exact header and tiny page bytes, the row coding with repeats, a decoded page against its source, failures. SPDX-License-Identifier: MIT */
+/* PWG raster: exact header and tiny page bytes, the row coding with repeats, a decoded page against its source, failures. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdlib.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-/* Print jobs: the IPP request around the PCL, every way the printer can fail, job splitting. SPDX-License-Identifier: MIT */
+/* Print jobs: the IPP request around the PCL, every way the printer can fail, job splitting. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdio.h>
 #include <stdlib.h>

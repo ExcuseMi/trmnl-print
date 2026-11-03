@@ -1,5 +1,5 @@
 /* make shots: the app's screens to PNG (shots/), and two PCL jobs (shots/sketch.pcl, shots/text.pcl) for a look with
-   a PCL renderer (make render). No printer is involved. SPDX-License-Identifier: MIT */
+   a PCL renderer (make render). No printer is involved. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,5 +1,5 @@
 /* Print's own read and write of the default printer text, on API 2.11 (device settings) and before (printer.cfg).
-   SPDX-License-Identifier: MIT */
+   SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdio.h>
 #include <string.h>

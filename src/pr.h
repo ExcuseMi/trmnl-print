@@ -1,5 +1,5 @@
 /* The Print app's controller: the file list, the preview, the print run and the messages. All decisions are here, on
-   the host-tested side; the glue (apps/trmnl-print/main.c) only feeds events and pushes the screen. SPDX-License-Identifier: MIT */
+   the host-tested side; the glue (apps/trmnl-print/main.c) only feeds events and pushes the screen. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PR_H
 #define PR_H
 #include <app_api.h>

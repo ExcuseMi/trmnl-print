@@ -1,5 +1,5 @@
 /* The firmware's file calls behind the list and the reader: other apps' folders from API 2.8 (api->size >= SLOT(53)),
-   else only the print app's own folder, as before. SPDX-License-Identifier: MIT */
+   else only the print app's own folder, as before. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef APPFS_H
 #define APPFS_H
 #include <app_api.h>

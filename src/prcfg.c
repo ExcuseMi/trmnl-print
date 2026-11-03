@@ -1,5 +1,5 @@
 /* Where the Print app keeps the default printer: the X's device settings on API 2.11+, else its own printer.cfg.
-   SPDX-License-Identifier: MIT */
+   SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "prcfg.h"
 #include <string.h>
 

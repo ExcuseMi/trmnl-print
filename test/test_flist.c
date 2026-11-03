@@ -1,4 +1,4 @@
-/* The file list: natural order, grouping, newest first, filters, limits, a failing file system. SPDX-License-Identifier: MIT */
+/* The file list: natural order, grouping, newest first, filters, limits, a failing file system. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdio.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-/* Float helpers without libm (the app loader resolves no math library). SPDX-License-Identifier: MIT */
+/* Float helpers without libm (the app loader resolves no math library). SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef FMATH_H
 #define FMATH_H
 #define FM_PI 3.14159265f

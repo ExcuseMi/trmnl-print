@@ -1,6 +1,6 @@
 /* Plain text and Markdown laid out on A4 pages: word wrap to the page width, headings (#, ##) bigger and bold, blank
    lines as gaps, page breaks. Lines are found one by one from the text in memory; a page is a short list of placed
-   lines, drawn into row bands so a page bitmap never exists. SPDX-License-Identifier: MIT */
+   lines, drawn into row bands so a page bitmap never exists. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef TEXTLAY_H
 #define TEXTLAY_H
 #include <stddef.h>

@@ -1,4 +1,4 @@
-/* PCL byte stream: exact bytes for a tiny bitmap, PackBits round trip, failures of the output. SPDX-License-Identifier: MIT */
+/* PCL byte stream: exact bytes for a tiny bitmap, PackBits round trip, failures of the output. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdlib.h>
 #include <string.h>

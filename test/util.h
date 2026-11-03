@@ -1,4 +1,4 @@
-/* Fakes for the host tests: a printer that records what is posted, a file system of a few files, pictures. SPDX-License-Identifier: MIT */
+/* Fakes for the host tests: a printer that records what is posted, a file system of a few files, pictures. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef UTIL_H
 #define UTIL_H
 #include <stdlib.h>

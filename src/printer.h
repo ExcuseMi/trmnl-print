@@ -6,7 +6,7 @@
        path=ipp/print
        format=pwg
    One key=value per line; unknown keys are ignored; host is required, the rest default (port 631, path ipp/print, pwg).
-   SPDX-License-Identifier: MIT */
+   SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PRINTER_H
 #define PRINTER_H
 #include <stddef.h>

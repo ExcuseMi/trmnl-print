@@ -1,4 +1,4 @@
-/* The Print app's own read and write of the default printer text (pr_env_t cfg_read / cfg_write). SPDX-License-Identifier: MIT */
+/* The Print app's own read and write of the default printer text (pr_env_t cfg_read / cfg_write). SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef PRCFG_H
 #define PRCFG_H
 #include "printer.h"

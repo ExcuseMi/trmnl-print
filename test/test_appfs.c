@@ -1,5 +1,5 @@
 /* Other apps' files through a fake of the firmware's API 2.8 calls: grouping, newest first, depth, filters, reading, and the
-   fallback to the own folder on older firmware. SPDX-License-Identifier: MIT */
+   fallback to the own folder on older firmware. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdlib.h>
 #include <string.h>

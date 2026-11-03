@@ -1,4 +1,4 @@
-/* The default printer file: parse, write, read back through the firmware calls another app uses. SPDX-License-Identifier: MIT */
+/* The default printer file: parse, write, read back through the firmware calls another app uses. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdio.h>
 #include <string.h>

@@ -1,5 +1,5 @@
 /* An IPP Print-Job request around a PCL stream, for printers that take jobs on port 631 (HTTP POST, Content-Type
-   application/ipp). The X's apps have http_request but no raw TCP socket, so port 9100 is out of reach. SPDX-License-Identifier: MIT */
+   application/ipp). The X's apps have http_request but no raw TCP socket, so port 9100 is out of reach. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef IPP_H
 #define IPP_H
 #include <stddef.h>

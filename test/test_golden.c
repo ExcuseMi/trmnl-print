@@ -1,6 +1,6 @@
 /* The printed bytes stay the same when the scaling or the raster loop is made faster: the whole posted job (IPP header,
    PWG or PCL raster) of busy pictures, turned and not, enlarged and shrunk, hashed against the bytes the first, plain
-   per-pixel box filter made (2026-11-03). SPDX-License-Identifier: MIT */
+   per-pixel box filter made (2026-11-03). SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdio.h>
 #include <stdlib.h>

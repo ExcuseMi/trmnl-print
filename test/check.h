@@ -1,4 +1,4 @@
-/* A minimal test harness: CHECK counts failures, each test file's main returns their number. SPDX-License-Identifier: MIT */
+/* A minimal test harness: CHECK counts failures, each test file's main returns their number. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef CHECK_H
 #define CHECK_H
 #include <stdio.h>

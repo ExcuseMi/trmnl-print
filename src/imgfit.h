@@ -1,5 +1,5 @@
 /* A 1-bit picture scaled to fit an A4 page (300 dpi) with its aspect kept, centred, a landscape picture turned to
-   fill the portrait page. Rows are made one at a time from the picture in memory. SPDX-License-Identifier: MIT */
+   fill the portrait page. Rows are made one at a time from the picture in memory. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef IMGFIT_H
 #define IMGFIT_H
 #include <stdint.h>

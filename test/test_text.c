@@ -1,4 +1,4 @@
-/* Text layout: wrap, headings, blank lines, page breaks, long words, UTF-8, CRLF, drawing. SPDX-License-Identifier: MIT */
+/* Text layout: wrap, headings, blank lines, page breaks, long words, UTF-8, CRLF, drawing. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include <stdlib.h>
 #include <string.h>

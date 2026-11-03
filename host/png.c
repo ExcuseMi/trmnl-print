@@ -1,4 +1,4 @@
-/* A 1-bit grayscale PNG of a canvas as the person sees it (turned to its position). SPDX-License-Identifier: MIT */
+/* A 1-bit grayscale PNG of a canvas as the person sees it (turned to its position). SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <zlib.h>

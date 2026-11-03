@@ -1,4 +1,4 @@
-/* See tbfw.cpp. SPDX-License-Identifier: MIT */
+/* See tbfw.cpp. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef TBFW_H
 #define TBFW_H
 #include <app_api.h>

@@ -1,6 +1,6 @@
 /* The list of printable files, grouped by the app that made them, newest first. The firmware's file_list gives names
    and sizes but no dates, so "newest" is the highest name in natural order (sk0012.png before sk0009.png, a title
-   with a later number first). SPDX-License-Identifier: MIT */
+   with a later number first). SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef FLIST_H
 #define FLIST_H
 #include <stdbool.h>

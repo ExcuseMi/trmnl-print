@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-/* The controller: list paging, preview, print flow, the printer setting, errors on the screen. SPDX-License-Identifier: MIT */
+/* The controller: list paging, preview, print flow, the printer setting, errors on the screen. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #include "check.h"
 #include "rig.h"
 

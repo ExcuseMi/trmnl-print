@@ -3,7 +3,7 @@
    the canvas is a window of it, (ox, oy) its origin, W x H its size (gfx_content): a hint strip along the touch
    bar's edge stays outside, and what the window holds beyond the screen is clipped. Every write is clipped to the
    screen, the canvas and the clip rectangle. Shapes follow Pillow's ImageDraw (inclusive boxes, outlines drawn inward), so the C
-   screens match the mockup renderer in tools/mock. SPDX-License-Identifier: MIT */
+   screens match the mockup renderer in tools/mock. SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 */
 #ifndef GFX_H
 #define GFX_H
 #include <stdint.h>
