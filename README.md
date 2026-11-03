@@ -7,10 +7,10 @@ Print for the TRMNL X: lists files, shows a sheet preview, sends the page to a n
 | PWG raster (header, row coding, line repeat) | `src/pwg.c` |
 | PCL stream, PackBits (fallback) | `src/pcl.c` |
 | IPP request header and answer status | `src/ipp.c` |
-| picture to A4 (turned if wide, aspect kept, centred) | `src/imgfit.c` |
+| picture to A4 (turned if wide, aspect kept, centred; each printer pixel's box from prefix sums, the last row and the boxes kept: O(printer pixels), `test/test_golden.c` holds the bytes) | `src/imgfit.c` |
 | text and Markdown headings to pages (word wrap, breaks, bands) | `src/textlay.c` |
 | file list (grouped, newest first) | `src/flist.c` |
-| jobs, error words, job splitting | `src/printjob.c` |
+| jobs, error words, job splitting; a picture's job a few rows a step (`pj_png_start`, `pj_job_step`: Sketch keeps its loop going) | `src/printjob.c` |
 | controller and screens | `src/pr.c`, `src/prui.c` |
 | app glue | `apps/trmnl-print/main.c` |
 
